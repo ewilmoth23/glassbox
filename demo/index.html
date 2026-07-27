@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glassbox v1 — killer query demo</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.45 -apple-system, system-ui, Segoe UI, sans-serif;
+         background: #0e1218; color: #d8dde6; }
+  header { padding: 8px 14px; background: #131923; border-bottom: 1px solid #232a37;
+           display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; letter-spacing: .3px; }
+  header .meta { color: #76808f; font-size: 11px; }
+  main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 38px); }
+  aside { padding: 12px; overflow-y: auto; background: #121722; border-right: 1px solid #232a37; }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+             color: #76808f; margin: 18px 0 6px; font-weight: 600; }
+  aside h2:first-child { margin-top: 0; }
+  aside label { display: block; font-size: 11px; color: #99a3b3; margin-bottom: 3px; }
+  aside input[type=text], aside select { width: 100%; padding: 6px 8px;
+    background: #0a0e15; border: 1px solid #232a37; color: #d8dde6;
+    border-radius: 4px; font: inherit; }
+  aside .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  aside .checks { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+  aside .checks label { display: flex; align-items: center; gap: 4px; font-size: 12px;
+    color: #d8dde6; padding: 3px 8px; background: #0a0e15; border: 1px solid #232a37;
+    border-radius: 4px; cursor: pointer; }
+  aside button.primary { width: 100%; padding: 8px; margin-top: 14px;
+    background: #2563eb; color: white; border: 0; border-radius: 4px;
+    font: inherit; font-weight: 600; cursor: pointer; }
+  aside button.primary:hover { background: #1d4ed8; }
+  aside button.primary:disabled { background: #374151; cursor: wait; }
+  #map { height: 100%; }
+  .panel { padding: 10px 12px; background: #0a0e15; border-radius: 4px;
+    border: 1px solid #232a37; font-size: 12px; line-height: 1.5; }
+  .stat { display: flex; justify-content: space-between; padding: 2px 0;
+    color: #99a3b3; }
+  .stat strong { color: #d8dde6; }
+  pre.brief { white-space: pre-wrap; word-break: break-word; padding: 10px;
+    background: #0a0e15; border: 1px solid #2563eb44; border-radius: 4px;
+    font: 12.5px/1.55 -apple-system, system-ui, sans-serif; color: #d8dde6;
+    margin: 0; }
+  pre.brief.empty { border-color: #232a37; color: #76808f; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; letter-spacing: .3px; margin-left: 6px;
+    text-transform: uppercase; }
+  .badge.llm { background: #d97706; color: black; }
+  .badge.det { background: #2563eb; color: white; }
+  /* Leaflet popups dark-mode */
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip
+    { background: #131923; color: #d8dde6; border: 1px solid #232a37; }
+  .leaflet-popup-content { font: 12px/1.5 -apple-system, system-ui, sans-serif; }
+  .leaflet-popup-content strong { color: #f9c74f; }
+  .leaflet-control-attribution { background: rgba(0,0,0,.5) !important;
+    color: #76808f !important; }
+  .leaflet-control-attribution a { color: #99a3b3 !important; }
+  .err { color: #f87171; padding: 8px; background: #0a0e15;
+    border: 1px solid #f87171; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Glassbox v1 — killer query demo</h1>
+  <span class="meta">
+    Backend: <code id="api-status">checking…</code>
+    · Tests: 140/140 · 9 ingesters · 7 finding kinds
+  </span>
+</header>
+
+<main>
+  <aside>
+    <h2>Bbox (W, S, E, N)</h2>
+    <div class="row">
+      <div><label>west</label><input type="text" id="west" value="-75"></div>
+      <div><label>south</label><input type="text" id="south" value="39"></div>
+    </div>
+    <div class="row">
+      <div><label>east</label><input type="text" id="east" value="-72"></div>
+      <div><label>north</label><input type="text" id="north" value="42"></div>
+    </div>
+    <div style="font-size: 11px; color: #76808f; margin-top: 4px;">
+      Quick: <a href="#" data-bbox="-75,39,-72,42">NYC</a>
+      · <a href="#" data-bbox="95,-10,145,15">Indonesia</a>
+      · <a href="#" data-bbox="-15,40,40,72">Europe</a>
+      · <a href="#" data-bbox="120,30,150,46">Japan</a>
+      · <a href="#" data-bbox="-180,-89,180,89">global</a>
+    </div>
+
+    <h2>Time window</h2>
+    <select id="window">
+      <option value="1">last 1 hour</option>
+      <option value="6">last 6 hours</option>
+      <option value="24" selected>last 24 hours</option>
+      <option value="168">last 7 days</option>
+    </select>
+
+    <h2>Entity types</h2>
+    <div class="checks">
+      <label><input type="checkbox" id="t-aircraft" checked> aircraft</label>
+      <label><input type="checkbox" id="t-vessel" checked> vessel</label>
+      <label><input type="checkbox" id="t-satellite"> satellite</label>
+    </div>
+
+    <h2>Brief mode</h2>
+    <select id="brief-mode">
+      <option value="none">no brief</option>
+      <option value="deterministic" selected>deterministic (instant, truthful)</option>
+      <option value="llm">LLM (slower, may misclassify)</option>
+    </select>
+
+    <h2>Limit</h2>
+    <input type="text" id="limit" value="500">
+
+    <button class="primary" id="run">Run query</button>
+
+    <h2>Result summary</h2>
+    <div class="panel" id="result-summary">
+      <span style="color:#76808f">No query run yet.</span>
+    </div>
+
+    <h2>Brief</h2>
+    <pre class="brief empty" id="brief-output">Press Run query.</pre>
+
+    <h2>API call</h2>
+    <div class="panel" id="api-call" style="word-break: break-all;">
+      <span style="color:#76808f">—</span>
+    </div>
+  </aside>
+
+  <div id="map"></div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function() {
+  // Map
+  var map = L.map('map', { worldCopyJump: true })
+    .setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18,
+  }).addTo(map);
+
+  var entityLayer = L.layerGroup().addTo(map);
+  var eventLayer = L.layerGroup().addTo(map);
+  var bboxLayer = L.layerGroup().addTo(map);
+
+  // Bbox preset links
+  document.querySelectorAll('a[data-bbox]').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var p = a.dataset.bbox.split(',').map(Number);
+      document.getElementById('west').value = p[0];
+      document.getElementById('south').value = p[1];
+      document.getElementById('east').value = p[2];
+      document.getElementById('north').value = p[3];
+    });
+  });
+
+  // Health probe
+  fetch('/api/v1/health/db')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('api-status').textContent = d.ok ? 'live (DB ok)' : 'unhealthy';
+      document.getElementById('api-status').style.color = d.ok ? '#86efac' : '#f87171';
+    })
+    .catch(function() {
+      document.getElementById('api-status').textContent = 'unreachable';
+      document.getElementById('api-status').style.color = '#f87171';
+    });
+
+  // Marker styles
+  function entityIcon(type, props) {
+    var color = type === 'aircraft' ? '#60a5fa'
+              : type === 'vessel'   ? '#34d399'
+              : type === 'satellite' ? '#fbbf24'
+              : '#a78bfa';
+    var emergency = props && props.emergency;
+    var military = props && props.military;
+    var ring = emergency ? '#f87171' : military ? '#fcd34d' : 'rgba(255,255,255,.15)';
+    var size = emergency ? 14 : 10;
+    return L.divIcon({
+      className: '',
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      html: '<div style="width:'+size+'px;height:'+size+'px;background:'+color+
+            ';border-radius:50%;border:2px solid '+ring+';box-shadow:0 0 4px rgba(0,0,0,.6)"></div>',
+    });
+  }
+  function eventIcon(eventType) {
+    var color = eventType === 'usgs_quake' || eventType === 'emsc_quake' ? '#ef4444'
+              : eventType === 'noaa_alert' ? '#fb923c'
+              : eventType === 'nasa_firms' ? '#f97316'
+              : eventType === 'nasa_eonet' ? '#a855f7'
+              : eventType === 'gdelt_topical' ? '#06b6d4'
+              : eventType === 'detected_proximity' ? '#facc15'
+              : '#94a3b8';
+    var symbol = eventType === 'detected_proximity' ? '★' : '◆';
+    return L.divIcon({
+      className: '',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      html: '<div style="font-size:14px;color:'+color+';line-height:16px;text-align:center;'+
+            'text-shadow:0 0 4px rgba(0,0,0,.8)">'+symbol+'</div>',
+    });
+  }
+
+  function fmt(n) {
+    return new Intl.NumberFormat().format(n);
+  }
+
+  function renderResult(body, apiUrl) {
+    entityLayer.clearLayers();
+    eventLayer.clearLayers();
+    bboxLayer.clearLayers();
+
+    // Bbox outline
+    var b = body.meta.bbox;
+    L.rectangle([[b[1], b[0]], [b[3], b[2]]], {
+      color: '#2563eb', weight: 1, fillOpacity: 0.05,
+    }).addTo(bboxLayer);
+
+    // Entities
+    body.entities.forEach(function(e) {
+      var p = e.position;
+      if (!p || p.lat == null || p.lng == null) return;
+      var props = e.properties || {};
+      var popup = '<strong>' + (e.display_name || e.canonical_id) + '</strong>'
+        + '<br>type: ' + e.entity_type
+        + '<br>id: ' + e.canonical_id
+        + (props.military ? '<br><span style="color:#fcd34d">⚑ military</span>' : '')
+        + (props.emergency ? '<br><span style="color:#f87171">⚠ emergency squawk ' + (props.squawk || '') + '</span>' : '')
+        + (p.altitude_m != null ? '<br>alt: ' + Math.round(p.altitude_m) + 'm' : '')
+        + (p.velocity_ms != null ? '<br>v: ' + Math.round(p.velocity_ms) + 'm/s' : '');
+      L.marker([p.lat, p.lng], { icon: entityIcon(e.entity_type, props) })
+        .bindPopup(popup)
+        .addTo(entityLayer);
+    });
+
+    // Events
+    body.events.forEach(function(e) {
+      if (e.lat == null || e.lng == null) return;
+      var popup = '<strong>' + (e.title || e.event_type) + '</strong>'
+        + '<br>type: ' + e.event_type
+        + (e.event_subtype ? ' / ' + e.event_subtype : '')
+        + (e.severity != null ? '<br>severity: ' + e.severity : '')
+        + (e.event_time ? '<br>time: ' + e.event_time.replace('T', ' ').substr(0, 19) + 'Z' : '');
+      L.marker([e.lat, e.lng], { icon: eventIcon(e.event_type) })
+        .bindPopup(popup)
+        .addTo(eventLayer);
+    });
+
+    // Summary
+    document.getElementById('result-summary').innerHTML = ''
+      + '<div class="stat"><span>entities</span><strong>' + fmt(body.meta.entity_count) + '</strong></div>'
+      + '<div class="stat"><span>events</span><strong>' + fmt(body.meta.event_count) + '</strong></div>'
+      + '<div class="stat"><span>query latency</span><strong>' + fmt(body.meta.query_ms) + ' ms</strong></div>'
+      + '<div class="stat"><span>types</span><strong>' + (body.meta.types || []).join(', ') + '</strong></div>';
+
+    // Brief
+    var brief = body.meta.brief;
+    var briefEl = document.getElementById('brief-output');
+    if (brief) {
+      briefEl.classList.remove('empty');
+      var isLLM = brief.indexOf('Analyst note') !== -1;
+      var badge = '<span class="badge ' + (isLLM ? 'llm' : 'det') + '">'
+        + (isLLM ? 'LLM' : 'DET') + '</span>';
+      briefEl.innerHTML = brief + '\n\n' + badge;
+    } else {
+      briefEl.classList.add('empty');
+      briefEl.textContent = '(no brief requested)';
+    }
+
+    // API call
+    document.getElementById('api-call').innerHTML = '<a href="' + apiUrl + '" target="_blank" style="color:#60a5fa">' + apiUrl + '</a>';
+
+    // Frame
+    var bounds = L.latLngBounds([[b[1], b[0]], [b[3], b[2]]]);
+    if (bounds.isValid() && (bounds.getNorth() - bounds.getSouth()) < 170) {
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }
+
+  function buildQuery() {
+    var w = parseFloat(document.getElementById('west').value);
+    var s = parseFloat(document.getElementById('south').value);
+    var e = parseFloat(document.getElementById('east').value);
+    var n = parseFloat(document.getElementById('north').value);
+    var hours = parseInt(document.getElementById('window').value, 10);
+    var tt = new Date();
+    var tf = new Date(tt.getTime() - hours * 3600 * 1000);
+    var types = [];
+    if (document.getElementById('t-aircraft').checked) types.push('aircraft');
+    if (document.getElementById('t-vessel').checked) types.push('vessel');
+    if (document.getElementById('t-satellite').checked) types.push('satellite');
+    var briefMode = document.getElementById('brief-mode').value;
+    var limit = parseInt(document.getElementById('limit').value, 10) || 500;
+
+    var qs = new URLSearchParams({
+      bbox: [w, s, e, n].join(','),
+      time_from: tf.toISOString(),
+      time_to: tt.toISOString(),
+      types: types.join(',') || 'aircraft',
+      limit: String(limit),
+    });
+    if (briefMode === 'deterministic') qs.append('brief', 'true');
+    if (briefMode === 'llm') qs.append('brief_llm', 'true');
+    return '/api/v1/viewport?' + qs.toString();
+  }
+
+  document.getElementById('run').addEventListener('click', function() {
+    var btn = document.getElementById('run');
+    btn.disabled = true;
+    btn.textContent = 'Querying...';
+    var url = buildQuery();
+    fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(body) {
+        renderResult(body, url);
+      })
+      .catch(function(err) {
+        document.getElementById('result-summary').innerHTML =
+          '<span class="err">Error: ' + err.message + '</span>';
+      })
+      .then(function() {
+        btn.disabled = false;
+        btn.textContent = 'Run query';
+      });
+  });
+})();
+</script>
+</body>
+</html>

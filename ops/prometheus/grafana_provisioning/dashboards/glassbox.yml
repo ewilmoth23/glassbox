@@ -1,0 +1,15 @@
+# Auto-provisioned dashboards. Picks up any JSON under
+# /etc/grafana/provisioning/dashboards/files inside the container.
+
+apiVersion: 1
+
+providers:
+  - name: glassbox
+    orgId: 1
+    folder: Glassbox
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/files

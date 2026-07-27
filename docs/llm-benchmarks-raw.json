@@ -1,0 +1,486 @@
+{
+  "started_at": "2026-05-20T21:07:13",
+  "elapsed_s": 472.3,
+  "models": [
+    "qwen2.5:14b",
+    "llama3.1:latest",
+    "qwen3.5:9b",
+    "deepseek-r1:14b"
+  ],
+  "tasks": [
+    "brief_llm",
+    "intel_query",
+    "forecast"
+  ],
+  "samples_per_task": {
+    "brief_llm": [
+      "brief_aircraft",
+      "brief_vessel",
+      "brief_nature"
+    ],
+    "intel_query": [
+      "intel_q1",
+      "intel_q2",
+      "intel_q3"
+    ],
+    "forecast": [
+      "forecast_seismic_japan",
+      "forecast_wildfire_west",
+      "forecast_maritime_baltic"
+    ]
+  },
+  "results": [
+    {
+      "model": "qwen2.5:14b",
+      "task": "brief_llm",
+      "sample_label": "brief_aircraft",
+      "call_idx": 1,
+      "wall_s": 84.9,
+      "output_bytes": 81,
+      "output_preview": "Investigate the 70 events of military aircraft underway with max severity of 5.0.",
+      "error": null,
+      "phase": "COLD"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "brief_llm",
+      "sample_label": "brief_vessel",
+      "call_idx": 2,
+      "wall_s": 2.39,
+      "output_bytes": 122,
+      "output_preview": "Investigate the high-severity proximity events involving aircraft .N952JB near METAR KJFK and a Special Weather Statement.",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "brief_llm",
+      "sample_label": "brief_nature",
+      "call_idx": 3,
+      "wall_s": 0.58,
+      "output_bytes": 18,
+      "output_preview": "No priority items.",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "intel_query",
+      "sample_label": "intel_q1",
+      "call_idx": 4,
+      "wall_s": 13.89,
+      "output_bytes": 1242,
+      "output_preview": "The most concerning maritime activity in the last 24 hours involves a significant number of port calls (1,229 events) and departures (767 events), which could indicate heightened naval or commercial s",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "intel_query",
+      "sample_label": "intel_q2",
+      "call_idx": 5,
+      "wall_s": 10.12,
+      "output_bytes": 1194,
+      "output_preview": "Based on the provided GLOBE context, there is no direct mention of seismic or earthquake-related events. The active layers and top severity events listed are primarily related to air traffic proximity",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "intel_query",
+      "sample_label": "intel_q3",
+      "call_idx": 6,
+      "wall_s": 11.28,
+      "output_bytes": 1206,
+      "output_preview": "**Intel Brief:**\n\n**Top Priority Watch Items (Next 12 Hours):**\n\n1. **Severe Air Quality Alerts:** Multiple locations report AQI at 500, indicating extreme air pollution levels in Kandy and H\u00e4mmerling",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "forecast",
+      "sample_label": "forecast_seismic_japan",
+      "call_idx": 7,
+      "wall_s": 4.02,
+      "output_bytes": 175,
+      "output_preview": "{\"prediction\": \"Increased seismic activity expected; potential M5+ quake in next 48 hours.\", \"confidence\": 0.75, \"watch_items\": [\"Tokyo Bay\", \"Chiba\", \"M7 historical events\"]}",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "forecast",
+      "sample_label": "forecast_wildfire_west",
+      "call_idx": 8,
+      "wall_s": 3.91,
+      "output_bytes": 185,
+      "output_preview": "{\"prediction\": \"Wildfire activity will intensify over next 48 hours in OR/ID/MT due to high pressure and fire weather conditions.\", \"confidence\": 0.9, \"watch_items\": [\"OR\", \"ID\", \"MT\"]}",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "qwen2.5:14b",
+      "task": "forecast",
+      "sample_label": "forecast_maritime_baltic",
+      "call_idx": 9,
+      "wall_s": 3.47,
+      "output_bytes": 203,
+      "output_preview": "{\"prediction\": \"Increased dark-shipping and proximity events suggest high risk for future incidents.\", \"confidence\": 0.85, \"watch_items\": [\"Dark-ship activity\", \"Proximity alerts\", \"Sanctioned vessels",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "brief_llm",
+      "sample_label": "brief_aircraft",
+      "call_idx": 1,
+      "wall_s": 9.97,
+      "output_bytes": 139,
+      "output_preview": "Investigate the 70 military aircraft underway events with a maximum severity of 5.0 to determine their current status and potential impact.",
+      "error": null,
+      "phase": "COLD"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "brief_llm",
+      "sample_label": "brief_vessel",
+      "call_idx": 2,
+      "wall_s": 1.1,
+      "output_bytes": 104,
+      "output_preview": "Investigate the proximity event with maximum severity (10.0) involving aircraft .N952JB near METAR KJFK.",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "brief_llm",
+      "sample_label": "brief_nature",
+      "call_idx": 3,
+      "wall_s": 0.77,
+      "output_bytes": 118,
+      "output_preview": "Investigate the lack of seismic activity within the past hour to determine if it's a normal fluctuation or an anomaly.",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "intel_query",
+      "sample_label": "intel_q1",
+      "call_idx": 4,
+      "wall_s": 7.93,
+      "output_bytes": 1278,
+      "output_preview": "**MARITIME INTEL BRIEF**\n\nBased on the provided data, the most concerning maritime activity in the last 24 hours appears to be the **detected_proximity events**, specifically those related to aircraft",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "intel_query",
+      "sample_label": "intel_q2",
+      "call_idx": 5,
+      "wall_s": 5.26,
+      "output_bytes": 1219,
+      "output_preview": "**Intel Brief**\n\nBased on the provided data, I've analyzed the top severity events related to detected proximity and aqi_reading. While these events are primarily focused on aircraft and air quality r",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "intel_query",
+      "sample_label": "intel_q3",
+      "call_idx": 6,
+      "wall_s": 4.83,
+      "output_bytes": 939,
+      "output_preview": "**Watch Item 1:** Aircraft SWR9LC has been detected in proximity to a high-AQI area (H\u00e4mmerlingstra\u00dfe) with a severity level of 10.0. This suggests potential security risks and requires immediate atte",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "forecast",
+      "sample_label": "forecast_seismic_japan",
+      "call_idx": 7,
+      "wall_s": 2.63,
+      "output_bytes": 226,
+      "output_preview": "{\n  \"prediction\": \"High likelihood of M6+ earthquake within 48 hours due to increased seismicity and historical precedent.\",\n  \"confidence\": 0.85,\n  \"watch_items\": [\n    \"Tokyo Bay\",\n    \"Chiba\",\n    ",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "forecast",
+      "sample_label": "forecast_wildfire_west",
+      "call_idx": 8,
+      "wall_s": 2.54,
+      "output_bytes": 265,
+      "output_preview": "{\n  \"prediction\": \"High probability of continued hotspot wildfire activity in the north_america_west region.\",\n  \"confidence\": 0.85,\n  \"watch_items\": [\n    \"OR/ID/MT under NOAA fire weather watch\",\n  ",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "llama3.1:latest",
+      "task": "forecast",
+      "sample_label": "forecast_maritime_baltic",
+      "call_idx": 9,
+      "wall_s": 2.63,
+      "output_bytes": 297,
+      "output_preview": "{\n  \"prediction\": \"High likelihood of suspicious activity involving sanctioned vessels in the Baltic Sea within the next 48 hours.\",\n  \"confidence\": 0.85,\n  \"watch_items\": [\n    \"Sanctioned vessel pro",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "brief_llm",
+      "sample_label": "brief_aircraft",
+      "call_idx": 1,
+      "wall_s": 24.04,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "COLD"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "brief_llm",
+      "sample_label": "brief_vessel",
+      "call_idx": 2,
+      "wall_s": 4.12,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "brief_llm",
+      "sample_label": "brief_nature",
+      "call_idx": 3,
+      "wall_s": 3.72,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "intel_query",
+      "sample_label": "intel_q1",
+      "call_idx": 4,
+      "wall_s": 21.65,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "intel_query",
+      "sample_label": "intel_q2",
+      "call_idx": 5,
+      "wall_s": 21.66,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "intel_query",
+      "sample_label": "intel_q3",
+      "call_idx": 6,
+      "wall_s": 21.63,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "forecast",
+      "sample_label": "forecast_seismic_japan",
+      "call_idx": 7,
+      "wall_s": 5.47,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "json_valid": false,
+      "json_error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "forecast",
+      "sample_label": "forecast_wildfire_west",
+      "call_idx": 8,
+      "wall_s": 4.78,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "json_valid": false,
+      "json_error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "phase": "warm"
+    },
+    {
+      "model": "qwen3.5:9b",
+      "task": "forecast",
+      "sample_label": "forecast_maritime_baltic",
+      "call_idx": 9,
+      "wall_s": 4.04,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "json_valid": false,
+      "json_error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "brief_llm",
+      "sample_label": "brief_aircraft",
+      "call_idx": 1,
+      "wall_s": 92.87,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "COLD"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "brief_llm",
+      "sample_label": "brief_vessel",
+      "call_idx": 2,
+      "wall_s": 5.18,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "brief_llm",
+      "sample_label": "brief_nature",
+      "call_idx": 3,
+      "wall_s": 3.99,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "intel_query",
+      "sample_label": "intel_q1",
+      "call_idx": 4,
+      "wall_s": 25.8,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "intel_query",
+      "sample_label": "intel_q2",
+      "call_idx": 5,
+      "wall_s": 22.71,
+      "output_bytes": 342,
+      "output_preview": "Based on the GLOBE CONTEXT and INTEL BRIEF provided, there are no direct indicators of earthquake activity or patterns suggesting an emerging seismic risk. The active layers and top severity events fo",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "intel_query",
+      "sample_label": "intel_q3",
+      "call_idx": 6,
+      "wall_s": 21.44,
+      "output_bytes": 0,
+      "output_preview": "",
+      "error": null,
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "forecast",
+      "sample_label": "forecast_seismic_japan",
+      "call_idx": 7,
+      "wall_s": 4.57,
+      "output_bytes": 243,
+      "output_preview": "{\n    \"prediction\": \"Earthquake magnitude \u22656 expected within 48 hours in Tokyo Bay-Chiba area.\",\n    \"confidence\": 0.75,\n    \"watch_items\": [\"M5.2 and M4.8 quakes indicate stress release; historical M",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "forecast",
+      "sample_label": "forecast_wildfire_west",
+      "call_idx": 8,
+      "wall_s": 1.02,
+      "output_bytes": 3,
+      "output_preview": "{ }",
+      "error": null,
+      "json_valid": false,
+      "json_parsed_keys": [],
+      "phase": "warm"
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "task": "forecast",
+      "sample_label": "forecast_maritime_baltic",
+      "call_idx": 9,
+      "wall_s": 3.29,
+      "output_bytes": 219,
+      "output_preview": "{ \"prediction\": \"Increased vessel activity and potential security incidents in Baltic Sea hotspot within next 48 hours.\", \"confidence\": 0.75, \"watch_items\": [\"Dark-ship events\", \"Proximity between san",
+      "error": null,
+      "json_valid": true,
+      "json_parsed_keys": [
+        "confidence",
+        "prediction",
+        "watch_items"
+      ],
+      "phase": "warm"
+    }
+  ]
+}

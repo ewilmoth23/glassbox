@@ -1,0 +1,2114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GLASSBOX · Spatial Intelligence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Glassbox — algorithm-derived OSINT intelligence with live globe, on-prem AI brief, news, and webcams. Sub-second SSE updates. Built for analysts.">
+<meta name="theme-color" content="#05080d">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/favicon.svg">
+<link rel="canonical" href="https://mewrcreate.com/">
+<link rel="alternate" type="application/rss+xml"  title="Glassbox · Chronicle (RSS)"        href="/signals.rss">
+<link rel="alternate" type="application/feed+json" title="Glassbox · Chronicle (JSON Feed)" href="/signals.json">
+
+<!-- Open Graph + Twitter Card for social sharing -->
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://mewrcreate.com/">
+<meta property="og:title"       content="GLASSBOX · live OSINT cockpit">
+<meta property="og:description" content="Sanctioned-vessel tracking, restricted airspace alerts, shadow-fleet clusters, country intel heatmap. Live algorithm-derived intelligence on a 3D globe.">
+<meta property="og:image"       content="https://mewrcreate.com/og-image.png">
+<meta property="og:image:width"  content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name"   content="Glassbox">
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="GLASSBOX · live OSINT cockpit">
+<meta name="twitter:description" content="Sanctioned vessels, restricted airspace, shadow-fleet clusters, country intel heat. Live on a 3D globe.">
+<meta name="twitter:image"       content="https://mewrcreate.com/og-image.png">
+
+<!-- JSON-LD structured data — helps Google's Knowledge Graph + AI Overviews
+     understand what this product is and which org publishes it. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Glassbox",
+  "alternateName": "Glassbox Spatial Intelligence",
+  "description": "Algorithm-derived OSINT intelligence with live 3D globe, on-prem AI brief, country-intel heatmap, sanctioned-vessel tracking, restricted-airspace alerts, and shadow-fleet cluster detection.",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "url": "https://mewrcreate.com/",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "publisher": {
+    "@type": "Organization",
+    "name": "MEWR Creative Enterprises LLC",
+    "url": "https://mewrcreate.com",
+    "logo": "https://mewrcreate.com/favicon.svg"
+  }
+}
+</script>
+
+<!-- Cesium for the live 3D globe (planes + ships in motion). Apache-2 license. -->
+<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Widgets/widgets.css">
+
+<!-- Geist (Vercel's modern geometric sans) — futuristic, NOT Inter / NOT Roboto.
+     Geist Mono for data labels in the same family. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ───────────────────────────────────────────────────────────────────
+   GLASSBOX // SPATIAL INTELLIGENCE
+   ─────────────────────────────────────────────────────────────────
+   Design language:
+     — deep space-black base (#05080d) with multiple z-layers of dark
+     — warm gold-amber accent (#ffb547) for headers + critical glow
+     — soft cyan (#7fd0ff) for live indicators + entity highlights
+     — Geist (Vercel's geometric sans) — modern, NOT cyberpunk-mono
+     — glassmorphic floating HUD panels at multiple depths
+     — bento layout (asymmetric tiles), NOT a 3-column grid
+     — Cesium globe is the canvas; panels float over it with backdrop
+       blur + warm border glow
+     — high information density — 8+ panels visible simultaneously
+   What we explicitly avoid (worldview-lookalike traps):
+     — magenta/purple cyberpunk neon
+     — terminal-mono everywhere
+     — TOP SECRET / DEFCON / classification cosplay banners
+     — 3-column rail/map/news Palantir grid
+   ─────────────────────────────────────────────────────────────────── */
+:root {
+  /* Background system — multiple depths */
+  --void:        #02040a;
+  --space:       #05080d;
+  --abyss:       #080d18;
+  --surface:     rgba(14, 19, 32, 0.72);   /* glassmorphic panel */
+  --surface-2:   rgba(14, 19, 32, 0.92);   /* opaque panel */
+  --surface-hi:  rgba(20, 27, 44, 0.85);
+  --rule:        rgba(255, 255, 255, 0.06);
+  --rule-hi:     rgba(255, 255, 255, 0.14);
+  --rule-glow:   rgba(255, 181, 71, 0.32);
+
+  /* Text */
+  --text:        #e9ecf2;
+  --text-soft:   #b6bcc8;
+  --muted:       #6a7383;
+
+  /* Signal palette — a single warm accent + cyan + tier colors */
+  --gold:        #ffb547;          /* primary accent (titles, glows) */
+  --gold-soft:   rgba(255, 181, 71, 0.16);
+  --gold-glow:   0 0 20px rgba(255, 181, 71, 0.35);
+  --cyan:        #7fd0ff;          /* live signals, entity highlights */
+  --cyan-soft:   rgba(127, 208, 255, 0.18);
+  --crit:        #ff5b5b;          /* critical only */
+  --crit-soft:   rgba(255, 91, 91, 0.18);
+  --crit-glow:   0 0 14px rgba(255, 91, 91, 0.55);
+  --high:        #ff9f3a;
+  --med:         #ffd166;
+  --low:         #54e29c;
+  --vessel:      #7fd0ff;
+  --aircraft:    #c8a6ff;
+
+  /* Type */
+  --display: "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --body:    "Geist", -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:    "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  overflow: hidden;
+  background: var(--void);
+}
+body {
+  color: var(--text);
+  font: 13px/1.45 var(--body);
+  font-feature-settings: "ss01", "kern", "liga", "tnum";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
+a {
+  color: var(--cyan);
+  text-decoration: none;
+  transition: color .2s, text-shadow .2s;
+}
+a:hover { color: var(--gold); text-shadow: 0 0 8px var(--gold-soft); }
+::selection { background: var(--gold); color: var(--space); }
+
+/* Scrollbar — slim, dark */
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-thumb { background: var(--rule-hi); border-radius: 2px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── Frame ─────────────────────────────────────────────────────── */
+.frame {
+  position: relative;
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 50%, var(--abyss) 0%, var(--void) 70%);
+}
+
+/* Subtle starfield behind the globe */
+.starfield {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(1px 1px at 28% 64%, rgba(255,255,255,0.4), transparent 50%),
+    radial-gradient(1.4px 1.4px at 47% 22%, rgba(255,255,255,0.5), transparent 50%),
+    radial-gradient(1px 1px at 71% 78%, rgba(255,255,255,0.45), transparent 50%),
+    radial-gradient(1px 1px at 89% 36%, rgba(255,255,255,0.35), transparent 50%),
+    radial-gradient(0.8px 0.8px at 8% 86%, rgba(255,255,255,0.55), transparent 50%),
+    radial-gradient(1.2px 1.2px at 56% 92%, rgba(255,255,255,0.4), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.7;
+}
+
+/* Vignette over globe edges to blend into space */
+.vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 55%,
+    transparent 30%, rgba(2,4,10,0.55) 100%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Cesium container */
+#cesiumContainer {
+  position: absolute; inset: 0;
+  z-index: 1;
+  background: transparent;
+}
+.cesium-viewer-bottom { display: none !important; }
+.cesium-widget-credits { display: none !important; }
+
+/* ─── Top HUD strip ──────────────────────────────────────────────── */
+.topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 48px;
+  z-index: 30;
+  display: flex; align-items: center;
+  padding: 0 22px;
+  gap: 20px;
+  background: linear-gradient(180deg,
+    rgba(2,4,10,0.85) 0%, rgba(2,4,10,0.55) 60%, transparent 100%);
+  border-bottom: 1px solid var(--rule);
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+
+.brand-mark {
+  display: flex; align-items: baseline; gap: 12px;
+  text-decoration: none;
+  border: 0;
+}
+.brand-mark .glyph {
+  width: 22px; height: 22px;
+  position: relative;
+  background:
+    radial-gradient(circle at 30% 30%, var(--gold), #c87a1a 70%, transparent 75%);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(255,181,71,0.55);
+}
+.brand-mark .glyph::after {
+  content: "";
+  position: absolute; inset: 4px;
+  border-radius: 50%;
+  background: var(--space);
+}
+.brand-mark .glyph::before {
+  content: "";
+  position: absolute; inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,181,71,0.35);
+  animation: pulse-ring 4s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(0.85); opacity: 0.8; }
+  60%  { transform: scale(1.15); opacity: 0.0; }
+  100% { transform: scale(1.15); opacity: 0.0; }
+}
+.brand-mark .name {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.brand-mark .name .em { color: var(--gold); }
+
+.context {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  padding-left: 16px;
+  border-left: 1px solid var(--rule-hi);
+}
+.context .v { color: var(--text); font-weight: 500; }
+
+.searchbar {
+  margin-left: auto;
+  width: 320px;
+  background: rgba(8,13,24,0.6);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: var(--text);
+  font: 12px var(--body);
+  outline: none;
+  transition: border-color .25s, box-shadow .25s;
+}
+.searchbar::placeholder { color: var(--muted); }
+.searchbar:focus {
+  border-color: var(--gold);
+  box-shadow: var(--gold-glow);
+}
+
+.topbar-meta {
+  display: flex; align-items: center; gap: 18px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.topbar-meta .clock { color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.topbar-meta .clock .v { color: var(--text); }
+.topbar-meta .live {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--cyan);
+  font-weight: 600;
+}
+.topbar-meta .live::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%      { opacity: 1.0; transform: scale(1.2); }
+}
+
+/* ─── Bottom HUD strip ──────────────────────────────────────────── */
+.bottombar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 38px;
+  z-index: 30;
+  display: flex; align-items: center;
+  padding: 0 22px;
+  gap: 18px;
+  background: linear-gradient(0deg,
+    rgba(2,4,10,0.9) 0%, rgba(2,4,10,0.5) 60%, transparent 100%);
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--muted);
+  pointer-events: none;
+}
+.bottombar > * { pointer-events: auto; }
+.bottombar .item .v { color: var(--text); }
+.bottombar .item .v.gold { color: var(--gold); }
+.bottombar .spacer { flex: 1; }
+
+.picker { display: inline-flex; gap: 0; }
+.picker button {
+  padding: 4px 10px;
+  color: var(--muted);
+  font: inherit;
+  border-right: 1px solid var(--rule);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.picker button:last-child { border-right: 0; }
+.picker button:hover { color: var(--text); }
+.picker button.active {
+  color: var(--gold);
+  text-shadow: 0 0 12px var(--gold-soft);
+}
+
+/* ─── Floating panel base ───────────────────────────────────────── */
+.panel {
+  position: absolute;
+  background: var(--surface);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  z-index: 20;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 18px 40px rgba(0,0,0,0.5),
+    0 4px 12px rgba(0,0,0,0.3);
+}
+.panel::before {
+  /* warm gold border-glow accent on the top edge */
+  content: "";
+  position: absolute; top: 0; left: 14px; right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%, var(--gold) 50%, transparent 100%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.panel .head {
+  padding: 9px 14px 7px;
+  display: flex; align-items: baseline; gap: 8px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.panel .head .num {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+.panel .head .live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+/* ─── Bento positions ───────────────────────────────────────────── */
+/* Top-left counters cluster (4 small bento cards) */
+.bento {
+  position: absolute;
+  top: 70px; left: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 280px;
+  z-index: 21;
+}
+.kpi {
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0.4;
+}
+.kpi .lbl {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.kpi .val {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin-top: 2px;
+  line-height: 1.0;
+}
+.kpi.crit .val { color: var(--crit); text-shadow: var(--crit-glow); }
+.kpi.gold .val { color: var(--gold); text-shadow: var(--gold-glow); }
+.kpi.cyan .val { color: var(--cyan); }
+.kpi .delta {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--muted);
+  margin-top: 2px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+
+/* Layers panel — under the bento cluster */
+.layers {
+  top: 218px; left: 22px;
+  width: 280px;
+  max-height: calc(100vh - 296px);
+  display: flex; flex-direction: column;
+}
+.layers .body {
+  overflow-y: auto;
+  padding: 6px 0 8px;
+}
+.lyr {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px;
+  cursor: pointer; user-select: none;
+  position: relative;
+}
+.lyr::before {
+  content: ""; position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 2px; background: transparent;
+  transition: background .2s;
+}
+.lyr.on::before { background: var(--gold); box-shadow: var(--gold-glow); }
+.lyr:hover { background: var(--gold-soft); }
+.lyr .swatch {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--rule-hi);
+  background: transparent;
+  flex-shrink: 0;
+  transition: background .2s, box-shadow .2s;
+}
+.lyr.on .swatch { background: var(--text); }
+.lyr.on.crit .swatch { background: var(--crit); border-color: var(--crit); box-shadow: var(--crit-glow); }
+.lyr.on.high .swatch { background: var(--high); border-color: var(--high); }
+.lyr.on.cyan .swatch { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.lyr.on.purple .swatch { background: var(--aircraft); border-color: var(--aircraft); box-shadow: 0 0 8px var(--aircraft); }
+.lyr.on.low  .swatch { background: var(--low); border-color: var(--low); }
+.lyr .name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-soft);
+}
+.lyr.on .name { color: var(--text); }
+.lyr .count {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Layer category accordion */
+.lyr-group { border-bottom: 1px solid var(--rule); }
+.lyr-group:last-child { border-bottom: none; }
+.lyr-group-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px;
+  cursor: pointer; user-select: none;
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-soft);
+}
+.lyr-group-head:hover { background: var(--gold-soft); }
+.lyr-group-head .chevron {
+  font-size: 9px; color: var(--muted);
+  width: 9px; text-align: center; flex-shrink: 0;
+  transition: transform .15s ease;
+}
+.lyr-group.collapsed .lyr-group-head .chevron { transform: rotate(-90deg); }
+.lyr-group-head .label { flex: 1; }
+.lyr-group-head .swatch.group {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid var(--rule-hi); background: transparent;
+  flex-shrink: 0; cursor: pointer;
+  transition: background .2s, box-shadow .2s, opacity .2s;
+}
+.lyr-group-head .swatch.group.all-on {
+  background: var(--gold); border-color: var(--gold); box-shadow: var(--gold-glow);
+}
+.lyr-group-head .swatch.group.mixed { background: var(--gold); opacity: .45; }
+.lyr-group-head .gcount {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.lyr-group.collapsed .lyr-group-body { display: none; }
+
+/* AI Brief — directly above the bottom bar, left side, spanning */
+.brief {
+  bottom: 52px; left: 22px;
+  width: 360px; max-height: 200px;
+  padding: 0;
+  display: flex; flex-direction: column;
+}
+.brief .body {
+  flex: 1;
+  padding: 10px 14px 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.brief .body .em-crit {
+  color: var(--crit);
+  font-weight: 600;
+  text-shadow: 0 0 6px var(--crit-soft);
+}
+.brief .attrib {
+  padding: 6px 14px 10px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  display: flex; gap: 8px;
+}
+.brief .attrib .v { color: var(--text); }
+
+/* News video — top-right */
+.news {
+  top: 70px; right: 22px;
+  width: 360px;
+  display: flex; flex-direction: column;
+}
+.news .tabs {
+  display: flex;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-hi);
+  overflow-x: auto;
+}
+.news .tabs::-webkit-scrollbar { display: none; }
+.news .tabs button {
+  flex-shrink: 0;
+  padding: 6px 11px;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+  border-right: 1px solid var(--rule);
+}
+.news .tabs button:hover { color: var(--text); }
+.news .tabs button.active {
+  color: var(--space);
+  background: var(--gold);
+  font-weight: 600;
+}
+.news iframe, .news .placeholder {
+  width: 100%; height: 200px;
+  border: 0; background: #000;
+  display: block;
+}
+.news .placeholder, .cams .placeholder {
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  background:
+    linear-gradient(135deg, rgba(255,181,71,0.04) 0%, transparent 60%),
+    repeating-linear-gradient(45deg,
+      rgba(255,255,255,0.015) 0 2px,
+      transparent 2px 22px),
+    #02040a;
+  transition: color .25s, background .25s;
+}
+.news .placeholder:hover, .cams .placeholder:hover {
+  color: var(--gold);
+}
+.news .placeholder .icon, .cams .placeholder .icon {
+  font-size: 22px;
+  color: var(--gold);
+  text-shadow: var(--gold-glow);
+}
+.news .placeholder .small, .cams .placeholder .small {
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: none;
+  font-style: italic;
+  color: var(--muted);
+  max-width: 240px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Chronicle — center-right, between News and Webcams */
+.chronicle {
+  top: 320px; right: 22px;
+  width: 360px;
+  max-height: calc(100vh - 600px);
+  display: flex; flex-direction: column;
+}
+.chronicle .body {
+  overflow-y: auto;
+  padding: 4px 0;
+  flex: 1;
+}
+.entry {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background .2s;
+}
+.entry:hover { background: var(--gold-soft); }
+.entry:last-child { border-bottom: 0; }
+.entry .meta {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.entry .meta .sev { font-weight: 700; }
+.entry .meta .sev.crit { color: var(--crit); }
+.entry .meta .sev.high { color: var(--high); }
+.entry .meta .sev.med  { color: var(--med); }
+.entry .meta .sev.low  { color: var(--low); }
+.entry .meta .when { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-soft); }
+.entry .title {
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 3px;
+}
+.entry .desc {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+.entry.fresh {
+  animation: fresh-flash 2.5s ease-out;
+}
+@keyframes fresh-flash {
+  0%   { background: var(--gold-soft); }
+  100% { background: transparent; }
+}
+
+/* Geofence save modal — appears after the operator locks the radius.
+   Center-screen, on top of everything. Operator types email, label,
+   layers, severity → POST to /api/glassbox/watchlist. */
+.geofence-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(2,4,10,0.78);
+  z-index: 5000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+}
+.geofence-modal.show { display: flex; }
+.geofence-modal .card {
+  width: 460px;
+  max-width: calc(100vw - 40px);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  padding: 24px;
+  color: var(--text);
+}
+.geofence-modal h2 {
+  font: 700 16px/1.2 Georgia, serif;
+  letter-spacing: 0.02em;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+.geofence-modal .sub {
+  font: 500 10px/1.4 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 14px;
+}
+.geofence-modal label {
+  display: block;
+  font: 600 10px/1 'Geist Mono', monospace;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin: 12px 0 4px;
+}
+.geofence-modal input[type=text],
+.geofence-modal input[type=email],
+.geofence-modal select {
+  width: 100%;
+  background: var(--surface-hi);
+  border: 1px solid var(--rule);
+  color: var(--text);
+  font: 500 13px/1.2 'Geist', sans-serif;
+  padding: 6px 8px;
+  outline: none;
+}
+.geofence-modal input:focus,
+.geofence-modal select:focus { border-color: var(--cyan); }
+.geofence-modal .geofence-layers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin-top: 4px;
+}
+.geofence-modal .geofence-layers label {
+  font: 500 11px/1.3 'Geist', sans-serif;
+  color: var(--text);
+  letter-spacing: 0;
+  text-transform: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  cursor: pointer;
+}
+.geofence-modal .geofence-layers input { width: auto; margin: 0; }
+.geofence-modal .row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.geofence-modal .row button {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--text-soft);
+  padding: 7px 14px;
+  font: 600 11px/1 'Geist Mono', monospace;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.geofence-modal .row button:hover { color: var(--text); border-color: var(--cyan); }
+.geofence-modal .row button.primary {
+  background: var(--cyan);
+  color: var(--surface);
+  border-color: var(--cyan);
+}
+.geofence-modal .row button.primary:hover {
+  background: var(--text);
+  color: var(--surface);
+}
+.geofence-modal .facts {
+  display: flex;
+  gap: 14px;
+  font: 500 10.5px/1 'Geist Mono', monospace;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  margin: 6px 0 0;
+}
+
+/* Tactical HUD — top-center heading compass strip. Pointer-events
+   none so it doesn't intercept globe drags; pure visual overlay. */
+.tactical-hud {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 250;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.thud-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font: 700 11px/1 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  color: var(--cyan);
+  text-shadow: 0 0 6px rgba(127, 208, 255, 0.4);
+}
+.thud-readout .deg {
+  font-size: 14px;
+}
+.thud-readout .card {
+  font-size: 10px;
+  color: var(--text-soft);
+  letter-spacing: 0.22em;
+}
+.thud-strip-window {
+  position: relative;
+  width: 220px;
+  height: 14px;
+  overflow: hidden;
+  border-top: 1px solid rgba(127, 208, 255, 0.20);
+  border-bottom: 1px solid rgba(127, 208, 255, 0.20);
+  background: linear-gradient(to right,
+    rgba(2,4,10,0.0) 0%,
+    rgba(2,4,10,0.6) 20%,
+    rgba(2,4,10,0.6) 80%,
+    rgba(2,4,10,0.0) 100%);
+}
+.thud-strip-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--cyan);
+  box-shadow: 0 0 4px rgba(127, 208, 255, 0.7);
+  z-index: 2;
+}
+.thud-strip {
+  position: absolute;
+  top: 0; left: 50%;
+  width: 720px;
+  margin-left: -360px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font: 600 9px/1 'Geist Mono', monospace;
+  color: var(--text-soft);
+  white-space: nowrap;
+  will-change: transform;
+}
+.thud-strip .tick {
+  position: absolute;
+  width: 1px;
+  top: 0; bottom: 0;
+  background: rgba(255,255,255,0.20);
+}
+.thud-strip .tick.card {
+  background: rgba(127,208,255,0.40);
+}
+.thud-strip .lbl {
+  position: absolute;
+  transform: translateX(-50%);
+  top: 50%;
+  margin-top: -5px;
+  text-align: center;
+  letter-spacing: 0.10em;
+}
+.thud-strip .lbl.card {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+/* Hotspots panel — preset regional flyto bookmarks. Left-side, below
+   the layers panel. Each button shows region name + coords; click
+   flies the camera. */
+.hotspots {
+  top: 218px; left: 312px;
+  width: 220px;
+  max-height: calc(100vh - 296px);
+  display: flex; flex-direction: column;
+}
+.hotspots .body {
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.hotspots .hs-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 14px;
+  background: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 80ms, border-color 80ms;
+}
+.hotspots .hs-item:hover {
+  background: rgba(127, 208, 255, 0.06);
+  border-left-color: var(--cyan);
+}
+.hotspots .hs-name {
+  font: 600 12px/1.2 'Geist', sans-serif;
+  color: var(--text);
+}
+.hotspots .hs-coord {
+  font: 500 9.5px/1 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+/* Entity detail panel — slides in from right on entity click.
+   Hidden by default; .entity-detail.show makes it visible. Uses a CSS
+   transition so the slide-in is smooth. Z-index sits above other panels. */
+.entity-detail {
+  top: 80px; right: 22px;
+  width: 340px;
+  max-height: calc(100vh - 160px);
+  display: flex; flex-direction: column;
+  transform: translateX(380px);
+  opacity: 0;
+  transition: transform 220ms ease-out, opacity 220ms ease-out;
+  pointer-events: none;
+  z-index: 1200;
+}
+.entity-detail.show {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.entity-detail .head {
+  background: var(--surface-hi);
+  border-bottom: 1px solid var(--rule);
+}
+.entity-detail .body {
+  padding: 12px 14px 14px;
+  overflow-y: auto;
+  font: 400 12px/1.5 'Geist', -apple-system, sans-serif;
+  color: var(--text);
+}
+.entity-detail .ed-id-line {
+  font: 700 14px/1.2 'Geist', sans-serif;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+.entity-detail .ed-sub {
+  font: 500 10px/1 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 10px;
+}
+.entity-detail .ed-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dotted var(--rule);
+  font-size: 11.5px;
+}
+.entity-detail .ed-row:last-child { border-bottom: 0; }
+.entity-detail .ed-lbl {
+  color: var(--text-soft);
+  font: 500 10.5px/1 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.entity-detail .ed-val {
+  font: 600 11.5px/1.2 'Geist Mono', ui-monospace, monospace;
+  color: var(--text);
+  text-align: right;
+  max-width: 60%;
+  word-break: break-word;
+}
+.entity-detail .ed-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font: 700 9px/1 'Geist Mono', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-right: 4px;
+  margin-bottom: 4px;
+  border: 1px solid;
+}
+.entity-detail .ed-badge.sanctioned {
+  color: var(--crit);
+  background: rgba(255, 91, 91, 0.12);
+  border-color: rgba(255, 91, 91, 0.35);
+}
+.entity-detail .ed-badge.military {
+  color: var(--warn);
+  background: rgba(255, 159, 58, 0.12);
+  border-color: rgba(255, 159, 58, 0.35);
+}
+.entity-detail .ed-badge.emergency {
+  color: var(--crit);
+  background: rgba(255, 91, 91, 0.18);
+  border-color: var(--crit);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+.entity-detail .ed-cta {
+  display: block;
+  margin-top: 12px;
+  padding: 7px 10px;
+  background: rgba(127, 208, 255, 0.10);
+  border: 1px solid rgba(127, 208, 255, 0.32);
+  color: var(--cyan);
+  font: 600 11px/1 'Geist Mono', monospace;
+  text-decoration: none;
+  text-align: center;
+  letter-spacing: 0.10em;
+}
+.entity-detail .ed-cta:hover {
+  background: rgba(127, 208, 255, 0.18);
+  border-color: var(--cyan);
+}
+.entity-detail .ed-track-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 10px;
+  background: rgba(200, 166, 255, 0.10);
+  border: 1px solid rgba(200, 166, 255, 0.32);
+  color: #c8a6ff;
+  font: 600 11px/1 'Geist Mono', monospace;
+  text-align: center;
+  letter-spacing: 0.10em;
+  cursor: pointer;
+}
+.entity-detail .ed-track-btn:hover {
+  background: rgba(200, 166, 255, 0.20);
+  border-color: #c8a6ff;
+}
+.entity-detail .ed-empty {
+  color: var(--text-soft);
+  font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Webcams — bottom-right, 2x2 grid above the bottombar */
+.cams {
+  bottom: 52px; right: 22px;
+  width: 360px;
+  display: flex; flex-direction: column;
+}
+.cams .tabs {
+  display: flex;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-hi);
+}
+.cams .tabs button {
+  flex: 1;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+  border-right: 1px solid var(--rule);
+}
+.cams .tabs button:last-child { border-right: 0; }
+.cams .tabs button:hover { color: var(--text); }
+.cams .tabs button.active { color: var(--cyan); }
+.cams .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  height: 220px;
+}
+.cams .tile {
+  background: #000;
+  position: relative;
+  overflow: hidden;
+}
+.cams .tile iframe {
+  width: 100%; height: 100%;
+  border: 0;
+}
+.cams .tile .lbl {
+  position: absolute; top: 4px; left: 4px;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: #fff;
+  background: rgba(0,0,0,0.7);
+  padding: 2px 6px;
+  border-radius: 2px;
+  z-index: 5;
+  pointer-events: none;
+}
+.cams .tile .open-yt {
+  position: absolute; top: 4px; right: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--gold);
+  background: rgba(0,0,0,0.78);
+  padding: 3px 6px 4px;
+  border-radius: 2px;
+  z-index: 6;
+  text-decoration: none;
+  border: 1px solid rgba(255,181,71,0.35);
+  transition: color .18s, background .18s, border-color .18s;
+}
+.cams .tile .open-yt:hover {
+  color: var(--space);
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.news .head .open-yt-head {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--gold);
+  padding: 2px 6px 3px;
+  border: 1px solid rgba(255,181,71,0.35);
+  border-radius: 2px;
+  text-decoration: none;
+  transition: color .18s, background .18s;
+}
+.news .head .open-yt-head:hover {
+  color: var(--space);
+  background: var(--gold);
+}
+
+/* Atlas tabs — vertical strip on the very far left edge */
+.atlas {
+  position: absolute;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  z-index: 22;
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border-right: 1px solid var(--rule);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
+}
+.atlas a {
+  padding: 12px 8px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  border: 0;
+  text-decoration: none;
+  transition: color .25s, background .25s;
+  width: 56px;
+}
+.atlas a:last-child { border-bottom: 0; }
+.atlas a:hover { color: var(--gold); background: var(--gold-soft); }
+.atlas a.active { color: var(--gold); }
+.atlas a .glyph {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 600;
+}
+.atlas a .lbl {
+  font-family: var(--mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+
+/* Alert ticker — thin band beneath the topbar showing the latest critical */
+.ticker {
+  position: absolute;
+  top: 48px; left: 0; right: 0;
+  height: 22px;
+  z-index: 25;
+  background: linear-gradient(90deg,
+    rgba(255,91,91,0.08) 0%, rgba(255,91,91,0.02) 100%);
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center;
+  padding: 0 22px;
+  gap: 10px;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.ticker .badge {
+  flex-shrink: 0;
+  color: var(--crit);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-shadow: var(--crit-glow);
+  display: flex; align-items: center; gap: 6px;
+}
+.ticker .badge::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--crit);
+  box-shadow: var(--crit-glow);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+.ticker .stream {
+  white-space: nowrap;
+  color: var(--text-soft);
+  animation: ticker-scroll 60s linear infinite;
+}
+.ticker .stream span {
+  margin-right: 36px;
+  color: var(--text-soft);
+}
+.ticker .stream span .gold { color: var(--gold); }
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ─── Tactical overlays — corner brackets + reticle + hover card ─── */
+/* Surveillance-grade visual treatment, NOT classification cosplay.
+   Corner brackets and center reticle give the globe an analyst's-
+   workstation feel. Hover-card follows the cursor and surfaces
+   vessel/aircraft/signal facts on hover (Apple Maps style). */
+/* Tactical corner brackets — hidden by default per user feedback
+   ("I do not want that military globe looking"). Re-enabled only if
+   the body carries class="show-tactical" (set via the layout menu). */
+.tactical-corners {
+  position: absolute;
+  top: 76px; left: 96px; right: 22px; bottom: 56px;
+  z-index: 8;
+  pointer-events: none;
+  display: none;
+}
+body.show-tactical .tactical-corners { display: block; }
+.tactical-corners .c {
+  position: absolute;
+  width: 18px; height: 18px;
+  border: 1px solid var(--gold);
+  opacity: 0.42;
+  filter: drop-shadow(0 0 5px var(--gold-soft));
+}
+.tactical-corners .c.tl { top: 0;     left: 0;     border-right: 0; border-bottom: 0; }
+.tactical-corners .c.tr { top: 0;     right: 0;    border-left: 0;  border-bottom: 0; }
+.tactical-corners .c.bl { bottom: 0;  left: 0;     border-right: 0; border-top: 0; }
+.tactical-corners .c.br { bottom: 0;  right: 0;    border-left: 0;  border-top: 0; }
+
+.reticle {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px; height: 28px;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;        /* hidden by default per user feedback */
+}
+body.show-tactical .reticle { opacity: 0.22; }
+.reticle::before, .reticle::after {
+  content: ""; position: absolute;
+  background: var(--gold);
+  box-shadow: 0 0 4px var(--gold-soft);
+}
+.reticle::before { top: 50%; left: 0;  right: 0; height: 1px; transform: translateY(-50%); }
+.reticle::after  { top: 0;   bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); }
+.reticle .ring {
+  position: absolute; inset: 7px;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+.hover-card {
+  position: absolute;
+  z-index: 60;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 181, 71, 0.42);
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  min-width: 200px;
+  max-width: 300px;
+  box-shadow:
+    0 0 0 1px rgba(255, 181, 71, 0.18),
+    0 6px 22px rgba(0,0,0,0.7);
+  opacity: 0;
+  transition: opacity 0.14s ease-out;
+  pointer-events: none;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+}
+.hover-card .hc-name {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.01em;
+  margin-bottom: 5px;
+  text-transform: none;
+  text-shadow: 0 0 8px var(--gold-soft);
+}
+.hover-card .hc-row {
+  margin: 1px 0;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+.hover-card .hc-row .lbl {
+  color: var(--muted);
+  display: inline-block;
+  width: 36px;
+}
+.hover-card .hc-crit {
+  color: var(--crit);
+  font-weight: 700;
+  margin-top: 4px;
+  text-shadow: 0 0 6px var(--crit-soft);
+}
+.hover-card .hc-when {
+  color: var(--muted);
+  margin-top: 5px;
+  font-size: 9px;
+}
+.hover-card .hc-desc {
+  color: var(--text-soft);
+  font-style: italic;
+  margin-top: 4px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Scale bar — slim ruler in the bottom HUD */
+.scale-bar {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-soft);
+  letter-spacing: 0.10em;
+}
+.scale-bar .ruler {
+  position: relative;
+  width: 100px; height: 6px;
+  border-left: 1px solid var(--gold);
+  border-right: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+  opacity: 0.65;
+}
+
+/* ─── Panel chrome: drag handle on header + window controls ────────
+   Every floating .panel becomes draggable (from the .head) and
+   resizable (from any edge). Three small buttons in the head:
+     • minimize (collapses to header-only)
+     • maximize/restore (fills viewport minus margins)
+     • close (hides; reopen via the bottom-bar Layout menu)
+   interact.js does the drag+resize math; layout state persists to
+   localStorage so the user's customizations survive a page reload. */
+.panel .head {
+  cursor: grab;
+  user-select: none;
+}
+.panel .head:active { cursor: grabbing; }
+.panel .head .ctl {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: auto;
+  padding-left: 8px;
+  border-left: 1px solid var(--rule);
+  opacity: 0.55;
+  transition: opacity .2s;
+}
+.panel:hover .head .ctl { opacity: 1; }
+.panel .head .ctl button {
+  width: 16px; height: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.panel .head .ctl button:hover { color: var(--gold); border-color: var(--gold-soft); }
+.panel .head .ctl button.close:hover { color: var(--crit); border-color: var(--crit-soft); }
+.panel.minimized .body,
+.panel.minimized .tabs,
+.panel.minimized iframe,
+.panel.minimized .grid,
+.panel.minimized .placeholder,
+.panel.minimized .attrib { display: none !important; }
+.panel.minimized { height: auto !important; }
+.panel.maximized {
+  top: 76px !important; left: 96px !important;
+  right: 22px !important; bottom: 56px !important;
+  width: auto !important; height: auto !important;
+}
+.panel.hidden { display: none !important; }
+.panel { touch-action: none; }    /* trackpad gesture passthrough */
+.panel .head .num { margin-left: 0; margin-right: 8px; }
+
+/* Resize handles — 4 edges + 4 corners on every panel.
+   Invisible by default, faint gold tint on hover so the user discovers
+   them without clutter. Corner handles overlap edge handles for the
+   classic window-resize feel. */
+.panel .rh {
+  position: absolute;
+  z-index: 22;
+  background: transparent;
+  transition: background .15s;
+}
+.panel:hover .rh:hover { background: rgba(255, 181, 71, 0.18); }
+.panel .rh.n  { top: -4px;    left: 10px;   right: 10px;   height: 8px;  cursor: ns-resize; }
+.panel .rh.s  { bottom: -4px; left: 10px;   right: 10px;   height: 8px;  cursor: ns-resize; }
+.panel .rh.e  { right: -4px;  top: 10px;    bottom: 10px;  width: 8px;   cursor: ew-resize; }
+.panel .rh.w  { left: -4px;   top: 10px;    bottom: 10px;  width: 8px;   cursor: ew-resize; }
+.panel .rh.ne { top: -4px;    right: -4px;  width: 14px;   height: 14px; cursor: ne-resize; }
+.panel .rh.nw { top: -4px;    left: -4px;   width: 14px;   height: 14px; cursor: nw-resize; }
+.panel .rh.se { bottom: -4px; right: -4px;  width: 14px;   height: 14px; cursor: se-resize; }
+.panel .rh.sw { bottom: -4px; left: -4px;   width: 14px;   height: 14px; cursor: sw-resize; }
+.panel.minimized .rh.s, .panel.minimized .rh.se, .panel.minimized .rh.sw,
+.panel.minimized .rh.n, .panel.minimized .rh.ne, .panel.minimized .rh.nw,
+.panel.minimized .rh.e, .panel.minimized .rh.w { display: none; }
+
+/* Bottom-bar 3D Tiles toggle button */
+.btn-3d {
+  font: inherit;
+  padding: 2px 10px;
+  color: var(--text-soft);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.btn-3d:hover { color: var(--gold); border-color: var(--gold-soft); }
+.btn-3d.on {
+  color: var(--space);
+  background: var(--gold);
+  border-color: var(--gold);
+  font-weight: 700;
+}
+
+/* Layout menu trigger in the bottom HUD */
+.layout-menu {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.layout-menu .trigger {
+  font: inherit; color: var(--text-soft);
+  padding: 2px 8px; cursor: pointer;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.layout-menu .trigger:hover { color: var(--gold); border-color: var(--gold-soft); }
+.layout-menu .pop {
+  position: absolute;
+  bottom: 100%; right: 0;
+  margin-bottom: 8px;
+  background: var(--surface-2);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--gold-soft);
+  border-radius: 4px;
+  padding: 6px 0;
+  min-width: 220px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.7);
+  z-index: 80;
+  display: none;
+}
+.layout-menu.open .pop { display: block; }
+.layout-menu .pop > div {
+  padding: 6px 12px;
+  font-family: var(--body);
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-soft);
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+}
+.layout-menu .pop > div:hover { background: var(--gold-soft); color: var(--text); }
+.layout-menu .pop .check {
+  display: inline-block; width: 12px; flex-shrink: 0;
+  color: var(--gold);
+}
+.layout-menu .pop .sep {
+  height: 1px; background: var(--rule);
+  margin: 4px 0; padding: 0; cursor: default;
+}
+.layout-menu .pop .sep:hover { background: var(--rule); }
+.layout-menu .pop .reset {
+  color: var(--crit);
+  font-weight: 600;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────── */
+@keyframes hud-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel, .bento, .atlas, .ticker {
+  animation: hud-fade-in 0.6s ease-out backwards;
+}
+.bento     { animation-delay: 0.10s; }
+.atlas     { animation-delay: 0.20s; }
+.layers    { animation-delay: 0.30s; }
+.brief     { animation-delay: 0.40s; }
+.news      { animation-delay: 0.50s; }
+.chronicle { animation-delay: 0.60s; }
+.cams      { animation-delay: 0.70s; }
+.ticker    { animation-delay: 0.85s; }
+
+/* ─── Loader ─────────────────────────────────────────────────────── */
+.loader {
+  position: absolute; inset: 0;
+  background: var(--void);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 22px;
+  z-index: 100;
+  transition: opacity .8s ease-out;
+}
+.loader.gone { opacity: 0; pointer-events: none; }
+.loader .mark {
+  font-family: var(--display);
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.loader .mark .em { color: var(--gold); text-shadow: var(--gold-glow); }
+.loader .sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+.loader .progress {
+  width: 240px; height: 1px;
+  background: var(--rule);
+  overflow: hidden;
+  position: relative;
+}
+.loader .progress::after {
+  content: "";
+  position: absolute;
+  width: 30%; height: 100%; left: -30%;
+  background: var(--gold);
+  box-shadow: var(--gold-glow);
+  animation: prog 1.6s ease-in-out infinite;
+}
+@keyframes prog {
+  0%   { left: -30%; }
+  100% { left: 100%; }
+}
+
+/* ─── Onboarding overlay (first-visit only) ──────────────────────── */
+.onboard {
+  position: fixed; inset: 0;
+  background: rgba(2, 4, 10, 0.86);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 200;
+  animation: ob-fade .35s ease-out;
+}
+.onboard.show { display: flex; }
+@keyframes ob-fade { from { opacity: 0; } to { opacity: 1; } }
+.onboard .card {
+  background: var(--surface-2);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  width: 540px; max-width: 92vw;
+  padding: 36px 36px 28px;
+  box-shadow:
+    0 0 0 1px rgba(255,181,71,0.18),
+    0 30px 80px rgba(0,0,0,0.7),
+    var(--gold-glow);
+  position: relative;
+  font-family: var(--body);
+}
+.onboard .card::before {
+  content: ""; position: absolute; top: 0; left: 24px; right: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.onboard .eyebrow {
+  font-family: var(--mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.22em;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+.onboard h2 {
+  font-family: var(--display);
+  font-size: 26px; font-weight: 700;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+.onboard h2 .em { color: var(--gold); }
+.onboard .lede {
+  font-size: 14px; line-height: 1.55;
+  color: var(--text-soft);
+  margin: 0 0 22px;
+}
+.onboard .lede strong { color: var(--text); font-weight: 500; }
+.onboard ul {
+  list-style: none; padding: 0; margin: 0 0 26px;
+  border-top: 1px solid var(--rule);
+}
+.onboard li {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px; line-height: 1.5;
+  color: var(--text-soft);
+}
+.onboard li .ico {
+  width: 26px; flex-shrink: 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--gold);
+  margin-top: 1px;
+}
+.onboard li strong {
+  color: var(--text); font-weight: 600;
+  display: block; margin-bottom: 1px;
+  font-family: var(--display);
+}
+.onboard .actions {
+  display: flex; gap: 12px;
+  margin-top: 4px;
+}
+.onboard .btn {
+  flex: 1;
+  padding: 11px 16px;
+  font-family: var(--mono); font-size: 11px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all .2s;
+  text-decoration: none;
+  text-align: center;
+  border: 1px solid var(--rule-hi);
+  background: transparent; color: var(--text-soft);
+  font-family: var(--mono);
+}
+.onboard .btn.primary {
+  background: var(--gold);
+  color: var(--space);
+  border-color: var(--gold);
+}
+.onboard .btn.primary:hover { background: #ffc870; }
+.onboard .btn.ghost:hover { color: var(--text); border-color: var(--gold-soft); }
+.onboard .footnote {
+  text-align: center;
+  margin-top: 18px;
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .news, .cams, .chronicle { display: none; }
+  .bento { width: 220px; grid-template-columns: 1fr; }
+  .layers { width: 220px; max-height: 240px; }
+  .brief { width: calc(100vw - 44px); }
+}
+</style>
+</head>
+<body>
+
+<!-- Onboarding overlay — appears once per browser per visitor, dismissed via
+     localStorage.glassbox_onboarded='1'. Cold visitors get 4 actions to try
+     before the cockpit reveals; returning visitors skip straight through. -->
+<div class="onboard" id="onboard" role="dialog" aria-labelledby="ob-title" aria-modal="true">
+  <div class="card">
+    <div class="eyebrow">Welcome to Glassbox · 30-second tour</div>
+    <h2 id="ob-title">Live OSINT, on a globe — <span class="em">no analyst required.</span></h2>
+    <p class="lede">
+      You're looking at <strong>~7,400 live entities</strong> right now: vessels broadcasting AIS,
+      aircraft on ADS-B, satellites propagating SGP4 in real time, plus every recent
+      sanctioned-vessel rendezvous, shadow-fleet cluster, and restricted-airspace incursion
+      our algorithms flagged in the last 24 hours.
+    </p>
+    <ul>
+      <li><span class="ico">⊞</span><span><strong>Pick a layer</strong>11 toggles on the left — sanctioned · gone dark, shadow-fleet clusters, military aircraft, wildfires, satellites…</span></li>
+      <li><span class="ico">↻</span><span><strong>Drag any panel</strong>Layers, AI Brief, Chronicle, Live News, Webcams — grab the header, drop where you want. Min/max/close buttons in each header.</span></li>
+      <li><span class="ico">⌖</span><span><strong>Click empty ocean</strong>Drop 100/250/500 km range rings to measure. Hover any pin for vessel name, MMSI, flag, sanction status.</span></li>
+      <li><span class="ico">$</span><span><strong>Pro tier · daily email digest + alerts</strong>$49/mo when the cohort opens. <a href="/pricing" style="color:var(--gold)">Join the waitlist →</a></span></li>
+    </ul>
+    <div class="actions">
+      <a href="/pricing" class="btn ghost" id="ob-pricing">See pricing</a>
+      <button class="btn primary" id="ob-dismiss">Show me the cockpit →</button>
+    </div>
+    <div class="footnote">No account needed · Full cockpit is free forever</div>
+  </div>
+</div>
+
+<div class="loader" id="loader">
+  <div class="mark">Glass<span class="em">box</span></div>
+  <div class="sub">Initializing spatial intelligence···</div>
+  <div class="progress"></div>
+</div>
+
+<div class="frame">
+
+  <!-- Background atmosphere -->
+  <div class="starfield"></div>
+
+  <!-- Globe (Cesium) -->
+  <div id="cesiumContainer"></div>
+
+  <!-- Vignette over globe edges -->
+  <div class="vignette"></div>
+
+  <!-- Tactical surveillance overlays -->
+  <div class="tactical-corners" aria-hidden="true">
+    <div class="c tl"></div><div class="c tr"></div>
+    <div class="c bl"></div><div class="c br"></div>
+  </div>
+  <div class="reticle" aria-hidden="true"><div class="ring"></div></div>
+
+  <!-- Hover card (positioned by JS over picked entities) -->
+  <div class="hover-card" id="hover-card" aria-hidden="true"></div>
+
+  <!-- Top HUD -->
+  <header class="topbar">
+    <a href="/" class="brand-mark">
+      <span class="glyph"></span>
+      <span class="name">GLASS<span class="em">BOX</span></span>
+    </a>
+    <div class="context">SPATIAL <span class="v">INTELLIGENCE</span></div>
+    <input class="searchbar" id="search" type="search"
+           placeholder="Search vessels, MMSI, IMO, callsign, port…">
+    <div class="topbar-meta">
+      <span id="measure-status"
+            style="display:none;border:1px solid var(--warn);padding:2px 8px;border-radius:3px;
+                   font:700 9px/1 'Geist Mono',ui-monospace,monospace;
+                   letter-spacing:0.12em;margin-right:8px;color:var(--warn);
+                   background:rgba(255,159,58,0.12)"></span>
+      <button id="measure-btn" type="button"
+              title="Measure mode: click points to measure distance + bearing (M)"
+              style="background:rgba(127,208,255,0.08);border:1px solid rgba(127,208,255,0.30);
+                     color:#7fd0ff;font:600 10px/1 'Geist Mono',ui-monospace,monospace;
+                     letter-spacing:0.10em;padding:5px 9px;border-radius:3px;cursor:pointer;
+                     margin-right:6px">MEASURE · M</button>
+      <span id="geofence-toast"
+            style="display:none;border:1px solid var(--crit);padding:2px 8px;border-radius:3px;
+                   font:700 9px/1 'Geist Mono',ui-monospace,monospace;letter-spacing:0.10em;
+                   margin-right:6px;color:var(--crit);background:rgba(255,91,91,0.14);
+                   max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button id="geofence-btn" type="button"
+              title="Draw a geofence: click center, drag radius, save as watchlist (G)"
+              style="background:rgba(127,208,255,0.08);border:1px solid rgba(127,208,255,0.30);
+                     color:#7fd0ff;font:600 10px/1 'Geist Mono',ui-monospace,monospace;
+                     letter-spacing:0.10em;padding:5px 9px;border-radius:3px;cursor:pointer;
+                     margin-right:6px">GEOFENCE · G</button>
+      <span id="view-mode-badge"
+            style="display:none;border:1px solid;padding:2px 8px;border-radius:3px;
+                   font:700 9px/1 'Geist Mono',ui-monospace,monospace;
+                   letter-spacing:0.14em;margin-right:8px"></span>
+      <button id="view-mode-btn" type="button"
+              title="Cycle view mode: Normal → NVG → FLIR → CRT → Tactical (V)"
+              style="background:rgba(127,208,255,0.08);border:1px solid rgba(127,208,255,0.30);
+                     color:#7fd0ff;font:600 10px/1 'Geist Mono',ui-monospace,monospace;
+                     letter-spacing:0.10em;padding:5px 9px;border-radius:3px;cursor:pointer;
+                     margin-right:10px">VIEW · V</button>
+      <span class="clock"><span id="utc-date">—</span> <span class="v" id="utc-time">—</span> UTC</span>
+      <span class="live">Live</span>
+    </div>
+  </header>
+
+  <!-- Critical alert ticker -->
+  <div class="ticker">
+    <span class="badge">⚠ Critical</span>
+    <div class="stream" id="ticker-stream">Loading…</div>
+  </div>
+
+  <!-- Atlas tabs (left edge, vertical) -->
+  <nav class="atlas">
+    <a href="/" class="active"><span class="glyph">⊞</span><span class="lbl">Hub</span></a>
+    <a href="/monitor"><span class="glyph">⊕</span><span class="lbl">Map</span></a>
+    <a href="/globe"><span class="glyph">◯</span><span class="lbl">Globe</span></a>
+    <a href="/network"><span class="glyph">⬡</span><span class="lbl">Net</span></a>
+    <a href="/signals"><span class="glyph">≡</span><span class="lbl">Sig</span></a>
+    <a href="/status"><span class="glyph">●</span><span class="lbl">Stat</span></a>
+    <a href="/pricing" style="color:var(--gold)"><span class="glyph">$</span><span class="lbl">Pro</span></a>
+    <a href="/docs"><span class="glyph">⌘</span><span class="lbl">API</span></a>
+  </nav>
+
+  <!-- Bento KPI cluster (top-left) -->
+  <div class="bento">
+    <div class="kpi crit">
+      <div class="lbl">Critical</div>
+      <div class="val" id="kpi-critical">—</div>
+      <div class="delta" id="kpi-critical-delta">last 24h</div>
+    </div>
+    <div class="kpi gold">
+      <div class="lbl">Open Cases</div>
+      <div class="val" id="kpi-cases">—</div>
+      <div class="delta">distinct entities</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Signals</div>
+      <div class="val" id="kpi-signals">—</div>
+      <div class="delta">algorithm fires</div>
+    </div>
+    <div class="kpi cyan">
+      <div class="lbl">Tracked</div>
+      <div class="val" id="kpi-tracked">—</div>
+      <div class="delta" id="kpi-tracked-delta">vessels + aircraft</div>
+    </div>
+  </div>
+
+  <!-- Geofence save modal (hidden until operator locks a radius) -->
+  <div class="geofence-modal" id="geofence-modal">
+    <div class="card">
+      <h2>Save Geofence Watchlist</h2>
+      <div class="sub">Get alerted when entities + findings enter this area</div>
+      <div class="facts">
+        <span>📍 <span id="gf-coords">—</span></span>
+        <span>⊙ <span id="gf-radius">—</span></span>
+      </div>
+
+      <label for="gf-email">Email for alerts</label>
+      <input id="gf-email" type="email" placeholder="you@example.com" autocomplete="email">
+
+      <label for="gf-label">Watchlist label</label>
+      <input id="gf-label" type="text" placeholder="e.g. Strait of Hormuz">
+
+      <label>Layers to watch</label>
+      <div class="geofence-layers" id="gf-layers">
+        <label><input type="checkbox" value="sanctioned_dark" checked> Sanctioned dark</label>
+        <label><input type="checkbox" value="sanctioned_rendezvous" checked> Rendezvous</label>
+        <label><input type="checkbox" value="shadow_fleet" checked> Shadow-fleet</label>
+        <label><input type="checkbox" value="sanctioned_airspace" checked> Restricted airspace</label>
+        <label><input type="checkbox" value="dark_vessel"> Dark vessels</label>
+        <label><input type="checkbox" value="loitering"> Loitering</label>
+        <label><input type="checkbox" value="military_air"> Military aircraft</label>
+        <label><input type="checkbox" value="quakes"> Earthquakes</label>
+      </div>
+
+      <label for="gf-severity">Min severity (1-10)</label>
+      <select id="gf-severity">
+        <option value="3">3 — All meaningful findings</option>
+        <option value="5" selected>5 — Medium and higher</option>
+        <option value="7">7 — High and critical only</option>
+        <option value="9">9 — Critical only</option>
+      </select>
+
+      <div class="row">
+        <button type="button" onclick="_closeGeofenceModal(false)">Cancel</button>
+        <button type="button" class="primary" onclick="_closeGeofenceModal(true)">Save Watchlist</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tactical HUD — top-center heading compass + cardinal strip -->
+  <div class="tactical-hud" id="tactical-hud">
+    <div class="thud-readout">
+      <span class="card" id="thud-cardinal">N</span>
+      <span class="deg"  id="thud-heading">000°</span>
+    </div>
+    <div class="thud-strip-window">
+      <div class="thud-strip-center"></div>
+      <div class="thud-strip" id="thud-strip">
+        <!-- Tick marks every 30°. Centered on heading=0 (N). The JS
+             updateHud() translates this strip horizontally to scroll
+             ticks under the fixed center indicator. -->
+        <!-- Cardinal letters at 30° intervals: -180..0..+180. We
+             render across -180..180 so the strip can show ±180° of
+             rotation. left:0 = -180°; left:50% = 0°; left:100% = +180°.
+             Pixel math: 720px wide ÷ 360° = 2px per degree. -->
+        <span class="tick card" style="left:0px"></span>
+        <span class="lbl  card" style="left:0px">S</span>
+        <span class="tick"      style="left:60px"></span>
+        <span class="lbl"       style="left:60px">210</span>
+        <span class="tick"      style="left:120px"></span>
+        <span class="lbl"       style="left:120px">240</span>
+        <span class="tick card" style="left:180px"></span>
+        <span class="lbl  card" style="left:180px">W</span>
+        <span class="tick"      style="left:240px"></span>
+        <span class="lbl"       style="left:240px">300</span>
+        <span class="tick"      style="left:300px"></span>
+        <span class="lbl"       style="left:300px">330</span>
+        <span class="tick card" style="left:360px"></span>
+        <span class="lbl  card" style="left:360px">N</span>
+        <span class="tick"      style="left:420px"></span>
+        <span class="lbl"       style="left:420px">030</span>
+        <span class="tick"      style="left:480px"></span>
+        <span class="lbl"       style="left:480px">060</span>
+        <span class="tick card" style="left:540px"></span>
+        <span class="lbl  card" style="left:540px">E</span>
+        <span class="tick"      style="left:600px"></span>
+        <span class="lbl"       style="left:600px">120</span>
+        <span class="tick"      style="left:660px"></span>
+        <span class="lbl"       style="left:660px">150</span>
+        <span class="tick card" style="left:720px"></span>
+        <span class="lbl  card" style="left:720px">S</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hotspots: preset regional flyto bookmarks (left, beside Layers) -->
+  <div class="panel hotspots" data-panel-id="hotspots">
+    <div class="head">
+      Hotspots <span class="num">16</span>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="close" title="Close (re-open from Layout menu)">×</button>
+      </span>
+    </div>
+    <div class="body" id="hotspots-body"></div>
+  </div>
+
+  <!-- Entity detail (right, slides in on entity click) -->
+  <aside class="panel entity-detail" id="entity-detail-panel"
+         data-panel-id="entity-detail">
+    <div class="head">
+      <span class="live-dot" style="background:var(--cyan)"></span>
+      Entity <span class="num" id="ed-kind">—</span>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="close" id="ed-close" title="Close (Esc)">×</button>
+      </span>
+    </div>
+    <div class="body" id="ed-body">
+      <div class="ed-empty">Click an entity on the globe to inspect.</div>
+    </div>
+  </aside>
+
+  <!-- Layers (left, under bento) -->
+  <div class="panel layers" data-panel-id="layers">
+    <div class="head">
+      Layers <span class="num" id="layers-count">—</span>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="max" title="Maximize">▢</button>
+        <button class="close" title="Close (re-open from Layout menu)">×</button>
+      </span>
+    </div>
+    <div class="body" id="layers-list"></div>
+  </div>
+
+  <!-- AI Brief (bottom-left) -->
+  <div class="panel brief" data-panel-id="brief">
+    <div class="head">
+      <span class="live-dot"></span>
+      AI Brief <span class="num" id="brief-window">1H</span>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="max" title="Maximize">▢</button>
+        <button class="close" title="Close">×</button>
+      </span>
+    </div>
+    <div class="body" id="brief-quote"><em>Drawing the world…</em></div>
+    <div class="attrib">
+      <span>On-prem · Ollama qwen2.5:14b</span>
+      <span style="margin-left:auto">Updated <span class="v" id="brief-time">—</span></span>
+    </div>
+  </div>
+
+  <!-- News video (top-right) -->
+  <div class="panel news" data-panel-id="news">
+    <div class="head">
+      <span class="live-dot"></span>
+      Live News <span class="num">8 ch</span>
+      <a class="open-yt-head" id="news-open-yt" href="#" target="_blank" rel="noopener" title="Open this channel's live stream on YouTube">↗</a>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="max" title="Maximize">▢</button>
+        <button class="close" title="Close">×</button>
+      </span>
+    </div>
+    <div class="tabs" id="news-tabs">
+      <button data-ch="UCNye-wNBqNL5ZzHSJj3l8Bg" class="active">Al Jazeera</button>
+      <button data-ch="UCQfwfsi5VrQ8yKZ-UWmAEFg">France 24</button>
+      <button data-ch="UCknLrEdhRCp1aegoMqRaCZg">DW News</button>
+      <button data-ch="UCoMdktPbSTixAyNGwb-UYkQ">Sky News</button>
+      <button data-ch="UCeY0bbntWzzVIaj2z3QigXg">NBC Now</button>
+      <button data-ch="UCBi2mrWuNuyYy4gbM6fU18Q">ABC</button>
+      <button data-ch="UCIALMKvObZNtJ6AmdCLP7Lg">Bloomberg</button>
+      <button data-ch="UC16niRr50-MSBwiO3YDb3RA">BBC</button>
+    </div>
+    <div id="news-frame" class="placeholder" data-ch="UCNye-wNBqNL5ZzHSJj3l8Bg" data-active>
+      <div class="icon">▶</div>
+      <div>Tap to play live news</div>
+      <div class="small">If a stream won't play here, click ↗ above to open on YouTube.</div>
+    </div>
+  </div>
+
+  <!-- Chronicle (mid-right) -->
+  <div class="panel chronicle" data-panel-id="chronicle">
+    <div class="head">
+      Chronicle <span class="num" id="chronicle-count">—</span>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="max" title="Maximize">▢</button>
+        <button class="close" title="Close">×</button>
+      </span>
+    </div>
+    <div class="body" id="chronicle"></div>
+  </div>
+
+  <!-- Webcams (bottom-right) -->
+  <div class="panel cams" data-panel-id="cams">
+    <div class="head">
+      Live Webcams <span class="num">4 cams</span>
+      <span class="ctl">
+        <button class="min" title="Minimize">−</button>
+        <button class="max" title="Maximize">▢</button>
+        <button class="close" title="Close">×</button>
+      </span>
+    </div>
+    <div class="tabs" id="cam-tabs">
+      <button data-set="world" class="active">World</button>
+      <button data-set="americas">Americas</button>
+      <button data-set="europe">Europe</button>
+      <button data-set="explore">Explore</button>
+    </div>
+    <div class="grid" id="webcam-grid"></div>
+  </div>
+
+  <!-- Bottom HUD -->
+  <div class="bottombar">
+    <span class="item">POS <span class="v" id="cam-pos">—</span></span>
+    <span class="picker" id="picker">
+      <button data-h="1">1H</button>
+      <button data-h="6">6H</button>
+      <button data-h="24" class="active">24H</button>
+      <button data-h="48">48H</button>
+      <button data-h="168">7D</button>
+    </span>
+    <button class="btn-3d" id="toggle-3d" title="Switch to Google Photorealistic 3D Tiles via Cesium Ion">🌐 3D Tiles</button>
+    <span class="spacer"></span>
+    <span class="scale-bar"><span class="ruler"></span><span id="scale-bar-text">—</span></span>
+    <span class="item">DB <span class="v" id="db-latency">—</span></span>
+    <span class="item">SOURCES <span class="v gold" id="ing-count">—</span></span>
+    <span class="item">REFRESH <span class="v" id="countdown">—</span></span>
+    <span class="layout-menu" id="layout-menu">
+      <button class="trigger" id="layout-trigger" title="Toggle panel visibility / reset layout">⊞ Layout</button>
+      <div class="pop" id="layout-pop">
+        <div data-toggle="layers"><span class="check" data-id="layers">✓</span>Layers</div>
+        <div data-toggle="brief"><span class="check" data-id="brief">✓</span>AI Brief</div>
+        <div data-toggle="news"><span class="check" data-id="news">✓</span>Live News</div>
+        <div data-toggle="chronicle"><span class="check" data-id="chronicle">✓</span>Chronicle</div>
+        <div data-toggle="cams"><span class="check" data-id="cams">✓</span>Live Webcams</div>
+        <div class="sep"></div>
+        <div data-action="toggle-tactical"><span class="check" data-tactical>&nbsp;</span>Tactical overlay (corners + reticle)</div>
+        <div class="sep"></div>
+        <div class="reset" data-action="reset">↺ Reset to default layout</div>
+      </div>
+    </span>
+    <span class="item">© MEWR · <a href="/status">Status</a> · <a href="/docs">API</a></span>
+  </div>
+
+  <!-- Hidden discovery links so the contract test stays green -->
+  <div style="display:none">
+    <a href="/signals.rss">RSS</a>
+    <a href="/signals.json">JSON Feed</a>
+    <a href="/api/v1/signals/snapshot.csv">CSV</a>
+    <a href="/signals/embed">Embed</a>
+    <a href="/api/sources">Sources</a>
+    <a href="/web">Legacy</a>
+    <a href="/glassbox">Cesium globe (legacy)</a>
+  </div>
+
+</div>
+
+<script src="/track.js?v=20260513" async></script>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Cesium.js"></script>
+<!-- ?v= bump on each atlas.js change to bust browser/CDN caches that
+     ignore our Cache-Control headers. Bump to today's date when you
+     edit atlas.js. -->
+<script src="/atlas.js?v=20260513-ui-pass2"></script>
+</body>
+</html>

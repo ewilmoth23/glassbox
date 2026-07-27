@@ -1,0 +1,128 @@
+# Example A/B shadow prefilter config.
+# ─────────────────────────────────────────────────────────────────────
+# This file is a STARTING POINT for an operator who wants to A/B-test
+# a prefilter config change. Copy this file, edit the slot you want to
+# experiment on, and point the daemon at the result via:
+#
+#   launchctl setenv GLASSBOX_PREFILTER_SHADOW_CONFIG \
+#     /Volumes/Mac\ Mini\ Expanded\ Storage/ewilmoth/glassbox-cache/my_shadow.yaml
+#
+#   launchctl unload /Users/ewilmoth/Library/LaunchAgents/com.mewr.glassbox-server.plist
+#   launchctl load   /Users/ewilmoth/Library/LaunchAgents/com.mewr.glassbox-server.plist
+#
+# After ~24h of traffic, read the confusion matrix:
+#
+#   curl -s http://127.0.0.1:8790/api/v1/health/full \
+#     | jq '.ingesters.items[] | select(.layer == "news") | .prefilter_health.shadow'
+#
+# Or scrape:
+#   curl -s http://127.0.0.1:8790/api/v1/metrics/prefilter \
+#     | grep glassbox_prefilter_shadow_outcome_total
+#
+# ─────────────────────────────────────────────────────────────────────
+# What this example tests:
+#   * Severity floor relaxed from 0.5 → 0.4 (15% more borderline events
+#     pass through).
+#   * Recency window doubled (6h → 12h) — agents see "older breaking
+#     news" they would have missed.
+#
+# Everything else is identical to prefilter.yaml; an operator who
+# wants to keep tracking the production config should diff this
+# against prefilter.yaml on every change.
+# ─────────────────────────────────────────────────────────────────────
+
+version: "1.0-shadow-example"
+
+rules:
+  category_filter:
+    mode: allow
+    subcategories:
+      # Same as production — the experiment is on severity + recency,
+      # not category coverage. Don't change this unless that's what
+      # you're testing.
+      - armed_conflict.airstrike
+      - armed_conflict.artillery
+      - armed_conflict.ground_assault
+      - armed_conflict.bombing
+      - armed_conflict.suicide_attack
+      - armed_conflict.assassination
+      - armed_conflict.mass_killing
+      - armed_conflict.wmd
+      - armed_conflict.occupation
+      - armed_conflict.ceasefire_break
+      - armed_conflict.blockade
+      - armed_conflict.skirmish
+      - violence_civil.riot
+      - violence_civil.assault
+      - violence_civil.kidnapping
+      - violence_civil.repression
+      - violence_civil.detention
+      - economic.sanctions
+      - economic.aid_cut
+      - humanitarian.refugee
+      - humanitarian.peacekeeping
+      - humanitarian.peacekeeping_end
+      - infrastructure.property_attack
+      - cyber.posture
+      - governance.investigation
+      - governance.judicial
+      - governance.leadership_change
+    flags_required: []
+    flags_blocked: []
+
+  severity_filter:
+    # ⚡ EXPERIMENT: prod is 0.5; shadow tries 0.4.
+    min_severity: 0.4
+    per_category_overrides:
+      diplomatic: 0.85
+      governance: 0.30
+      cyber: 0.40
+      humanitarian: 0.45
+
+  geography_filter:
+    precision_min: region
+    bbox_allowlist: []
+    iso_country_allowlist: []
+    iso_country_blocklist: []
+
+  source_quality_filter:
+    min_score: 0.50
+    unknown_domain_score: 0.30
+    data_file: data/source_quality.json
+
+  recency_filter:
+    # ⚡ EXPERIMENT: prod is 6; shadow tries 12.
+    max_age_hours: 12
+
+  dedup_filter:
+    enabled: true
+    window_minutes: 60
+    similarity_threshold: 0.85
+    geo_threshold_km: 50
+    fields_compared: ["title", "actor1", "actor2", "subcategory"]
+
+priority:
+  weights:
+    severity:    0.30
+    source:      0.20
+    duplication: 0.20
+    recency:     0.10
+    category:    0.10
+    geo_aoi:     0.10
+  category_priority_bonuses:
+    armed_conflict.wmd: 1.0
+    armed_conflict.mass_killing: 0.95
+    armed_conflict.assassination: 0.85
+    armed_conflict.airstrike: 0.80
+    armed_conflict.bombing: 0.80
+    armed_conflict.suicide_attack: 0.85
+    economic.sanctions: 0.60
+    humanitarian.refugee: 0.65
+    cyber.posture: 0.50
+
+queue:
+  max_depth: 500
+  redis_key: glassbox:prefilter:queue:shadow
+
+ab_test:
+  enabled: false

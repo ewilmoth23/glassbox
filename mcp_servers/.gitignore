@@ -1,0 +1,6 @@
+# Per-package isolated venv (Python 3.11+; main glassbox-server stays on 3.9).
+# Ops bootstrap: see README.md.
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc

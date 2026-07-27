@@ -1,0 +1,16 @@
+# Auto-provisioned Prometheus datasource for Grafana.
+# Loaded from /etc/grafana/provisioning/datasources at container start.
+# Idempotent: editable in the UI but state on disk wins on next restart.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # 'prometheus' is the service name in docker-compose.yml
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 30s

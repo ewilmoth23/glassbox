@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Glassbox brand mark — a gold sphere with a dark inner aperture and
+       a faint outer ring. Same metaphor as the brand-mark in /atlas.js
+       (a lens / aperture looking out at the world). -->
+  <defs>
+    <radialGradient id="g" cx="35%" cy="35%" r="65%">
+      <stop offset="0%"  stop-color="#ffd166"/>
+      <stop offset="60%" stop-color="#ffb547"/>
+      <stop offset="100%" stop-color="#c87a1a"/>
+    </radialGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="#02040a"/>
+  <circle cx="16" cy="16" r="11" fill="url(#g)"/>
+  <circle cx="16" cy="16" r="4.5" fill="#02040a"/>
+  <circle cx="16" cy="16" r="13.5" fill="none"
+          stroke="#ffb547" stroke-opacity="0.45" stroke-width="0.7"/>
+</svg>

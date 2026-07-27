@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox · Analytics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+:root {
+  --bg: #02040a; --panel: #0b0f1a; --rule: rgba(255,255,255,0.08);
+  --text: #e9ecf2; --muted: #6a7383; --gold: #ffb547; --cyan: #7fd0ff; --crit: #ff5b5b;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 13px/1.5 -apple-system, "Helvetica Neue", sans-serif; }
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 24px; border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em;
+}
+.topbar .brand { color: var(--gold); font-weight: 700; }
+.topbar .picker { margin-left: auto; display: flex; gap: 4px; }
+.topbar .picker button {
+  background: transparent; color: var(--muted); border: 1px solid var(--rule);
+  padding: 4px 10px; cursor: pointer; font: inherit; border-radius: 3px;
+}
+.topbar .picker button.active { color: var(--gold); border-color: var(--gold); }
+.grid {
+  display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 18px;
+  padding: 22px;
+}
+.card {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 18px 20px; min-height: 100px;
+}
+.card h3 {
+  margin: 0 0 14px; font-family: var(--mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.18em; color: var(--gold);
+}
+.kpi-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+}
+.kpi { font-family: var(--mono); font-size: 38px; font-weight: 600; color: var(--text); line-height: 1; }
+.kpi .lbl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); display: block; margin-top: 6px; }
+.kpi.cyan { color: var(--cyan); }
+.kpi.gold { color: var(--gold); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--mono); }
+table td, table th {
+  padding: 6px 8px; border-bottom: 1px solid var(--rule);
+  text-align: left; color: var(--text);
+}
+table th { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; font-weight: 600; }
+table td.num { text-align: right; color: var(--gold); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+</style>
+<script src="/track.js" async></script>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand">GLASSBOX · ANALYTICS</span>
+  <span style="color:var(--muted)">First-party · no cookies · IP-hashed daily</span>
+  <span class="picker" id="picker">
+    <button data-h="1">1H</button>
+    <button data-h="24" class="active">24H</button>
+    <button data-h="168">7D</button>
+    <button data-h="720">30D</button>
+  </span>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Top paths</h3>
+    <table id="t-paths"><thead><tr><th>Path</th><th class="num">Hits</th><th class="num">Uniques</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Traffic</h3>
+    <div class="kpi-row">
+      <div><div class="kpi cyan" id="k-events">—</div><span class="lbl">Pageviews</span></div>
+      <div><div class="kpi gold" id="k-uniques">—</div><span class="lbl">Unique visitors</span></div>
+    </div>
+    <h3 style="margin-top:22px">Top countries</h3>
+    <table id="t-countries"><thead><tr><th>Country</th><th class="num">Uniques</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Waitlist conversions</h3>
+    <table id="t-conv"><thead><tr><th>Source</th><th class="num">Signups</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin-top:22px">External referrers</h3>
+    <table id="t-ref"><thead><tr><th>Referrer</th><th class="num">Hits</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let WINDOW_H = 24;
+
+async function load() {
+  const r = await fetch(`/api/v1/analytics/summary?window_hours=${WINDOW_H}`);
+  const d = await r.json();
+  $('k-events').textContent = (d.total_events || 0).toLocaleString();
+  $('k-uniques').textContent = (d.unique_visitors || 0).toLocaleString();
+  fillTable('t-paths', d.top_paths, ['path', 'hits', 'uniques']);
+  fillTable('t-countries', d.top_countries, ['country', 'uniques']);
+  fillTable('t-conv', d.conversions_by_source, ['source', 'conversions']);
+  fillTable('t-ref', d.top_external_referrers, ['referrer', 'hits']);
+}
+
+function fillTable(id, rows, fields) {
+  const tbody = document.querySelector(`#${id} tbody`);
+  if (!rows || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${fields.length}" class="empty">No data in this window.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const cells = fields.map((f, i) => {
+      const v = r[f];
+      const cls = (i > 0) ? 'num' : '';
+      const txt = (typeof v === 'number') ? v.toLocaleString() : (v || '').toString().slice(0, 60);
+      return `<td class="${cls}">${esc(txt)}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+$('picker').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-h]');
+  if (!btn) return;
+  $('picker').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  WINDOW_H = parseInt(btn.dataset.h, 10);
+  load();
+});
+
+load();
+setInterval(load, 30000);
+</script>
+
+</body>
+</html>

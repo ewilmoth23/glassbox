@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox — entity profile</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Entity profile: track history, recent algorithm-derived events, and known aliases.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  :root {
+    --bg: #ffffff; --bg-soft: #f5f6f8; --panel: #ffffff;
+    --border: #e3e5e8; --text: #14171a; --muted: #6b7077;
+    --accent: #2f5fff;
+    --critical: #d6243a; --critical-bg: #fff0f1;
+    --high: #b94a00;     --high-bg: #fff5e6;
+    --medium: #6e5800;   --medium-bg: #fff9d6;
+    --low: #1a6b3f;      --low-bg: #ecf7f0;
+    --link: #2f5fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --bg-soft: #161922; --panel: #161922;
+      --border: #232831; --text: #e6edf3; --muted: #8b95a3;
+      --accent: #79a8ff;
+      --critical: #ff6071; --critical-bg: #2b1318;
+      --high: #ffae5c;     --high-bg: #2b1d10;
+      --medium: #f3da6c;   --medium-bg: #2b260f;
+      --low: #5fd690;      --low-bg: #112619;
+      --link: #79a8ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-soft);
+    padding: 16px 24px;
+  }
+  header .row {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  header .crumbs {
+    font-size: 13px; color: var(--muted);
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  .profile {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+  }
+  .profile h1 {
+    margin: 0 0 6px; font-size: 24px; font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .profile .sub {
+    color: var(--muted); font-size: 13px;
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .profile .sub .k {
+    background: var(--bg-soft); padding: 1px 7px; border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pill {
+    display: inline-block; font-size: 11px; padding: 2px 9px;
+    border-radius: 999px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--bg-soft); color: var(--muted);
+  }
+  .pill.critical { background: var(--critical-bg); color: var(--critical); }
+  .pill.high     { background: var(--high-bg);     color: var(--high); }
+  .pill.medium   { background: var(--medium-bg);   color: var(--medium); }
+  .pill.low      { background: var(--low-bg);      color: var(--low); }
+  .pill.vessel    { background: #e6f0ff; color: #1a4dcc; }
+  .pill.aircraft  { background: #fff0e6; color: #cc561a; }
+  .pill.satellite { background: #f3e6ff; color: #7a1acc; }
+  @media (prefers-color-scheme: dark) {
+    .pill.vessel    { background: #16203b; color: #79a8ff; }
+    .pill.aircraft  { background: #2b1d10; color: #ffae5c; }
+    .pill.satellite { background: #2a1a3b; color: #c08bff; }
+  }
+
+  #map {
+    height: 400px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  #map.empty { display: none; }
+  .leaflet-container { background: var(--bg-soft); font: inherit; }
+  .leaflet-popup-content {
+    font: 13px/1.4 -apple-system, sans-serif; margin: 10px 12px;
+  }
+
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  section.panel h2 {
+    margin: 0; padding: 14px 18px;
+    font-size: 14px; font-weight: 600;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  section.panel h2 .count {
+    margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  table td, table th {
+    padding: 9px 18px;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table tr:first-child td, table tr:first-child th { border-top: 0; }
+  table td.time {
+    color: var(--muted); white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    width: 22%;
+  }
+  table td.title { font-weight: 500; }
+  table td.title .desc {
+    color: var(--muted); font-weight: 400; font-size: 12px;
+    margin-top: 2px;
+  }
+  table td.meta { width: 22%; color: var(--muted); font-size: 12px; }
+
+  .empty-msg {
+    color: var(--muted); padding: 24px; text-align: center;
+    font-style: italic;
+  }
+  .err-banner {
+    background: var(--critical-bg); color: var(--critical);
+    border: 1px solid var(--critical); padding: 10px 14px;
+    border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 32px; padding: 24px;
+    color: var(--muted); font-size: 12px;
+  }
+  footer .row { max-width: 1100px; margin: 0 auto; }
+  footer p { margin: 0 0 6px; }
+  footer a { color: var(--link); }
+
+  @media (max-width: 600px) {
+    main { padding: 16px; }
+    .profile h1 { font-size: 20px; }
+    table td, table th { padding: 9px 12px; }
+    table td.meta { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="crumbs"><a href="/signals">← signals</a> &nbsp;·&nbsp; entity profile</div>
+  </div>
+</header>
+
+<main>
+  <div id="error" class="err-banner" hidden></div>
+
+  <section class="profile" id="profile">
+    <h1 id="display-name">Loading…</h1>
+    <div class="sub" id="profile-sub"></div>
+  </section>
+
+  <div id="map" class="empty" aria-label="Track history map"></div>
+
+  <section class="panel">
+    <h2>Recent multi-entity events <span class="count" id="events-count">—</span></h2>
+    <table id="events-table">
+      <tbody><tr><td class="empty-msg" colspan="3">Loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Known aliases (entity resolution) <span class="count" id="aliases-count">—</span></h2>
+    <table id="aliases-table">
+      <tbody><tr><td class="empty-msg" colspan="3">Loading…</td></tr></tbody>
+    </table>
+  </section>
+</main>
+
+<footer>
+  <div class="row">
+    <p>Entity records are derived from public sources. Track history reflects the live position record (AIS for vessels, ADS-B for aircraft, SGP4 for satellites). Multi-entity events are algorithm-derived findings where this entity appeared alongside one or more partners (rendezvous, shadow-fleet cluster, sanctions-match, etc.). Aliases are produced by Splink probabilistic entity resolution against the consolidated 3-authority sanctions index.</p>
+    <p>Backend: <a id="raw-link" href="#">/api/v1/entity/{id}</a> &nbsp;·&nbsp; <a href="/signals">today’s signals</a> &nbsp;·&nbsp; <a href="/status">system status</a></p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const $ = (id) => document.getElementById(id);
+
+// Pull the UUID out of the URL path: /entity/<uuid>
+function entityIdFromUrl() {
+  const m = location.pathname.match(/\/entity\/([0-9a-fA-F\-]{36})/);
+  return m ? m[1] : null;
+}
+
+const ENTITY_ID = entityIdFromUrl();
+let MAP = null, TRACK_LAYER = null;
+
+function fmtRel(iso) {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1)  return "just now";
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h ago";
+  return Math.floor(h / 24) + "d ago";
+}
+function fmtTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(undefined, {
+    hour: "2-digit", minute: "2-digit",
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;",
+  }[m]));
+}
+
+function renderProfile(e) {
+  $("display-name").textContent = e.display_name || "(no display name)";
+  document.title = "Glassbox — " + (e.display_name || ENTITY_ID.slice(0, 8));
+  const parts = [];
+  parts.push(`<span class="pill ${e.entity_type || ''}">${escapeHtml(e.entity_type || 'entity')}</span>`);
+  if (e.canonical_id_type && e.canonical_id) {
+    parts.push(`<span class="k">${escapeHtml(e.canonical_id_type.toUpperCase())}: ${escapeHtml(e.canonical_id)}</span>`);
+  }
+  if (e.first_seen) parts.push(`first seen ${fmtRel(e.first_seen)}`);
+  if (e.last_seen)  parts.push(`last seen ${fmtRel(e.last_seen)}`);
+  // Surface a couple of the more useful properties bag fields.
+  const p = e.properties || {};
+  for (const k of ["callsign", "ship_type", "icao24", "operator", "country"]) {
+    if (p[k] != null && p[k] !== "") {
+      parts.push(`<span class="k">${escapeHtml(k)}: ${escapeHtml(String(p[k]).trim())}</span>`);
+    }
+  }
+  $("profile-sub").innerHTML = parts.join("");
+  $("raw-link").href = "/api/v1/entity/" + ENTITY_ID;
+  $("raw-link").textContent = "/api/v1/entity/" + ENTITY_ID;
+}
+
+function initMap() {
+  if (MAP || typeof L === "undefined") return;
+  MAP = L.map("map", { worldCopyJump: true }).setView([20, 0], 2);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(MAP);
+  TRACK_LAYER = L.featureGroup().addTo(MAP);
+}
+
+function renderTrack(track) {
+  const points = (track || [])
+    .filter(t => t.lat != null && t.lng != null)
+    .map(t => [t.lat, t.lng, t.time]);
+  if (!points.length) return;
+  initMap();
+  $("map").classList.remove("empty");
+  TRACK_LAYER.clearLayers();
+  // Polyline of historical track (skip if only one point — Leaflet
+  // draws a degenerate line).
+  if (points.length > 1) {
+    L.polyline(points.map(p => [p[0], p[1]]), {
+      color: "#2f5fff", weight: 2, opacity: 0.7,
+    }).addTo(TRACK_LAYER);
+  }
+  // Last-known position (most-recent — the API returns track ordered
+  // newest-first per query_entity_detail).
+  const last = points[0];
+  L.circleMarker([last[0], last[1]], {
+    radius: 7, color: "#fff", fillColor: "#d6243a",
+    fillOpacity: 1, weight: 2,
+  }).bindPopup(`<strong>Last seen</strong><br>${fmtTime(last[2])}`)
+    .addTo(TRACK_LAYER);
+  try {
+    MAP.fitBounds(TRACK_LAYER.getBounds().pad(0.2), { maxZoom: 8 });
+  } catch (e) { /* swallow */ }
+  setTimeout(() => MAP.invalidateSize(), 0);
+}
+
+function renderEvents(events) {
+  const tbody = $("events-table").querySelector("tbody");
+  $("events-count").textContent = events.length;
+  if (!events.length) {
+    tbody.innerHTML =
+      `<tr><td class="empty-msg" colspan="3">No multi-entity events in the past 7 days.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = events.map(ev => {
+    const partners = (ev.partners || []).map(p =>
+      `<a href="/entity/${escapeHtml(p.entity_id)}">${escapeHtml(p.display_name || p.canonical_id || p.entity_id.slice(0, 8))}</a>`
+    ).join(", ") || "—";
+    return `
+      <tr>
+        <td class="time" title="${escapeHtml(ev.event_time)}">${fmtRel(ev.event_time)}</td>
+        <td class="title">
+          <a href="/api/v1/event/${escapeHtml(ev.id)}">${escapeHtml(ev.title || ev.event_type)}</a>
+          ${ev.description ? `<div class="desc">${escapeHtml(ev.description)}</div>` : ""}
+        </td>
+        <td class="meta">
+          <div>${escapeHtml(ev.event_type)}</div>
+          <div>partners: ${partners}</div>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
+function renderAliases(aliases) {
+  const tbody = $("aliases-table").querySelector("tbody");
+  $("aliases-count").textContent = aliases.length;
+  if (!aliases.length) {
+    tbody.innerHTML =
+      `<tr><td class="empty-msg" colspan="3">No alias edges from Splink ER. (This is normal for live entities not yet matched against the sanctions index.)</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = aliases.map(a => `
+    <tr>
+      <td class="title">${escapeHtml(a.sanctioned_name || "(unknown)")}</td>
+      <td class="meta">${escapeHtml(a.sanctioned_canonical_id || "")}</td>
+      <td class="time">prob ${(a.match_probability != null ? a.match_probability.toFixed(2) : "—")}</td>
+    </tr>`).join("");
+}
+
+async function load() {
+  if (!ENTITY_ID) {
+    $("error").hidden = false;
+    $("error").textContent = "No entity UUID in URL. Try /entity/<uuid>.";
+    return;
+  }
+  try {
+    // Fan out three requests in parallel — full profile + cross-domain
+    // events + aliases. Each is independent.
+    const [pRes, xRes, aRes] = await Promise.all([
+      fetch("/api/v1/entity/" + ENTITY_ID),
+      fetch("/api/v1/entities/" + ENTITY_ID + "/cross_domain?within_hours=168&limit=20"),
+      fetch("/api/v1/entities/" + ENTITY_ID + "/aliases"),
+    ]);
+    if (!pRes.ok) throw new Error("entity not found (HTTP " + pRes.status + ")");
+    const profile = await pRes.json();
+    renderProfile(profile.entity || profile);
+    renderTrack(profile.track || []);
+    if (xRes.ok) {
+      const x = await xRes.json();
+      renderEvents(x.events || []);
+    } else {
+      renderEvents([]);
+    }
+    if (aRes.ok) {
+      const a = await aRes.json();
+      renderAliases(a.aliases || []);
+    } else {
+      renderAliases([]);
+    }
+  } catch (e) {
+    $("error").hidden = false;
+    $("error").textContent = "Failed to load entity: " + (e.message || e);
+    $("display-name").textContent = "(error)";
+  }
+}
+
+load();
+</script>
+</body>
+</html>

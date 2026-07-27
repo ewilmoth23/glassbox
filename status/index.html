@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox — system status</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Live operational status of the Glassbox OSINT platform: per-source ingester health, database, and last-update timestamps. Updates every 30 seconds.">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e3e5e8;
+    --text: #14171a;
+    --muted: #6b7077;
+    --accent: #2f5fff;
+    --green: #1a8a4f;
+    --green-bg: #ddf3e3;
+    --green-rail: #2cc775;
+    --yellow: #a06a00;
+    --yellow-bg: #fff3d6;
+    --yellow-rail: #d8a013;
+    --red: #c0202f;
+    --red-bg: #fde0e3;
+    --red-rail: #e23d4f;
+    --link: #2f5fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --bg-soft: #161922;
+      --panel: #161922;
+      --border: #232831;
+      --text: #e6edf3;
+      --muted: #8b95a3;
+      --accent: #79a8ff;
+      --green: #5fd690;
+      --green-bg: #112619;
+      --green-rail: #3ab472;
+      --yellow: #f3da6c;
+      --yellow-bg: #2b260f;
+      --yellow-rail: #c4a020;
+      --red: #ff6071;
+      --red-bg: #2b1318;
+      --red-rail: #d83a4d;
+      --link: #79a8ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-soft);
+    padding: 18px 24px;
+  }
+  header .row {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  header .meta {
+    color: var(--muted); font-size: 13px;
+    margin-left: auto; font-variant-numeric: tabular-nums;
+  }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  .banner {
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--border);
+  }
+  .banner.green  { background: var(--green-bg);  color: var(--green);  border-color: var(--green-rail); }
+  .banner.yellow { background: var(--yellow-bg); color: var(--yellow); border-color: var(--yellow-rail); }
+  .banner.red    { background: var(--red-bg);    color: var(--red);    border-color: var(--red-rail); }
+  .banner .dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: currentColor; flex-shrink: 0;
+    box-shadow: 0 0 0 0 currentColor;
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.55; }
+    70% { box-shadow: 0 0 0 8px transparent; opacity: 1; }
+    100% { box-shadow: 0 0 0 0 transparent; opacity: 0.55; }
+  }
+  .banner .text { font-size: 17px; font-weight: 600; }
+  .banner .sub  { color: var(--muted); font-size: 13px; margin-top: 2px; font-weight: 400; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat .label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .stat .value {
+    font-size: 24px; font-weight: 700; margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat.green  .value { color: var(--green); }
+  .stat.yellow .value { color: var(--yellow); }
+  .stat.red    .value { color: var(--red); }
+
+  .group {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .group h2 {
+    margin: 0; padding: 14px 18px;
+    font-size: 14px; font-weight: 600;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .group h2 .count {
+    margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  table.sources {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.sources td {
+    padding: 9px 18px;
+    border-top: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  table.sources tr:first-child td { border-top: 0; }
+  table.sources td.layer {
+    font-weight: 600; width: 18%;
+  }
+  table.sources td.source {
+    color: var(--muted); width: 42%;
+  }
+  table.sources td.last {
+    font-variant-numeric: tabular-nums; color: var(--muted);
+    width: 20%; white-space: nowrap;
+  }
+  table.sources td.health { width: 20%; white-space: nowrap; }
+  .pill {
+    display: inline-block; font-size: 11px; padding: 2px 9px;
+    border-radius: 999px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pill.green  { background: var(--green-bg);  color: var(--green); }
+  .pill.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .pill.red    { background: var(--red-bg);    color: var(--red); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 36px;
+    padding: 24px;
+    color: var(--muted); font-size: 12px;
+  }
+  footer .row { max-width: 1100px; margin: 0 auto; }
+  footer p { margin: 0 0 6px; }
+  footer a { color: var(--link); }
+
+  .err-banner {
+    background: var(--red-bg); color: var(--red);
+    border: 1px solid var(--red-rail); padding: 10px 14px;
+    border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+  }
+
+  @media (max-width: 600px) {
+    main { padding: 16px; }
+    table.sources td { padding: 9px 14px; }
+    table.sources td.source { display: none; }
+    table.sources td.layer { width: 38%; }
+    table.sources td.last { width: 32%; }
+    table.sources td.health { width: 30%; }
+    header { padding: 14px 16px; }
+    header h1 { font-size: 16px; }
+  }
+</style>
+<script src="/track.js" async></script>
+</head>
+<body>
+<header>
+  <div class="row" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <a href="/" style="text-decoration:none;color:inherit;font-weight:600;border:1px solid currentColor;padding:4px 10px;border-radius:4px;font-size:12px;opacity:0.85" title="Back to Spatial Intelligence cockpit">← Home</a>
+    <h1 style="margin:0;flex:1">Glassbox — system status</h1>
+    <div class="meta">
+      Updated <span id="updated-at">—</span>
+      &nbsp;·&nbsp; refresh in <span id="countdown">—</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="error" class="err-banner" hidden></div>
+  <div id="banner" class="banner green">
+    <span class="dot"></span>
+    <div>
+      <div class="text" id="banner-text">Loading…</div>
+      <div class="sub"  id="banner-sub"></div>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div id="groups"></div>
+</main>
+
+<footer>
+  <div class="row">
+    <p><a href="/signals">Today’s signals</a> &nbsp;·&nbsp; <a href="/signals.rss">RSS feed</a> &nbsp;·&nbsp; <a href="/api/v1/health/full">JSON health</a> &nbsp;·&nbsp; <a href="/api/sources">Source registry</a></p>
+    <p>Glassbox runs continuously on a single Mac Mini ingesting 26+ public OSINT sources. SLA breach on any ingester (no successful fetch in 3× its expected cadence) trips this page from green to yellow. Database errors trip it red. Per-source state above is read live from <a href="/api/v1/health/full">/api/v1/health/full</a> on every refresh.</p>
+  </div>
+</footer>
+
+<script>
+const REFRESH_SEC = 30;
+const $ = (id) => document.getElementById(id);
+
+function fmtRel(iso) {
+  if (!iso) return "never";
+  const dms = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(dms / 1000);
+  if (s < 60) return s + "s ago";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h ago";
+  return Math.floor(h / 24) + "d ago";
+}
+
+function fmtNum(n) { return n == null ? "—" : n.toLocaleString(); }
+
+function fmtAbsTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(undefined, {
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    month: "short", day: "numeric"
+  });
+}
+
+function pillFor(h) {
+  if (h === "ok") return '<span class="pill green">ok</span>';
+  if (h === "down" || h === "error")
+    return '<span class="pill red">' + h + '</span>';
+  return '<span class="pill yellow">' + h + '</span>';
+}
+
+function groupItems(items) {
+  // Group by `layer` so a status reader sees "ships (3 sources)"
+  // rather than three sibling rows. Sort layers by criticality —
+  // intel-bearing layers (sanctions, planes, ships) on top.
+  const order = [
+    "planes", "ships", "satellites", "earthquakes", "sanctions_*",
+    "news", "gdelt", "weather", "aqi", "fires", "police_incidents",
+  ];
+  const buckets = {};
+  for (const it of items) {
+    const key = (it.layer || "other");
+    (buckets[key] ||= []).push(it);
+  }
+  const sorted = Object.keys(buckets).sort((a, b) => {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  return sorted.map(k => ({ layer: k, items: buckets[k] }));
+}
+
+function renderGroup(g) {
+  const rows = g.items.map(it => {
+    const last = it.last_fetch_ts
+      ? `<span title="${it.last_fetch_ts}">${fmtRel(it.last_fetch_ts)}</span>`
+      : '<span style="color: var(--muted)">never</span>';
+    const sla = it.sla_breach
+      ? '<span class="pill red">SLA</span>'
+      : pillFor(it.health);
+    return `
+      <tr>
+        <td class="layer">${it.layer || "—"}</td>
+        <td class="source">${it.source || "—"}</td>
+        <td class="last">${last}</td>
+        <td class="health">${sla}</td>
+      </tr>`;
+  }).join("");
+  const okCount = g.items.filter(i => i.health === "ok" && !i.sla_breach).length;
+  return `
+    <div class="group">
+      <h2>${g.layer}<span class="count">${okCount}/${g.items.length} ok</span></h2>
+      <table class="sources"><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+function renderStats(d) {
+  const ing = d.ingesters || {};
+  const items = [
+    { label: "Sources",     value: fmtNum(ing.total),       cls: "" },
+    { label: "OK",          value: fmtNum(ing.ok),          cls: "green" },
+    { label: "Degraded",    value: fmtNum(ing.degraded),    cls: ing.degraded > 0 ? "yellow" : "" },
+    { label: "Down",        value: fmtNum(ing.down),        cls: ing.down > 0 ? "red" : "" },
+    { label: "SLA breach",  value: fmtNum(ing.sla_breach),  cls: ing.sla_breach > 0 ? "yellow" : "" },
+    { label: "DB latency",  value: (d.db && d.db.ok ? d.db.latency_ms + "ms" : "—"),
+      cls: d.db && d.db.ok ? "green" : "red" },
+  ];
+  return items.map(i => `
+    <div class="stat ${i.cls}">
+      <div class="label">${i.label}</div>
+      <div class="value">${i.value}</div>
+    </div>`).join("");
+}
+
+function bannerFor(d) {
+  const ing = d.ingesters || {};
+  const dbOk = d.db && d.db.ok;
+  if (!dbOk) {
+    return { cls: "red", text: "Database is unreachable",
+             sub: (d.db && d.db.error) || "" };
+  }
+  if (ing.down > 0) {
+    return { cls: "red",
+             text: ing.down + " source(s) down",
+             sub: "Some ingesters are not running. The intel pipeline is degraded." };
+  }
+  if (ing.degraded > 0 || ing.sla_breach > 0) {
+    return { cls: "yellow",
+             text: (ing.sla_breach || ing.degraded) + " source(s) degraded",
+             sub: "Some ingesters are slow or behind their SLA. Findings may lag." };
+  }
+  return { cls: "green",
+           text: "All systems operational",
+           sub: "All " + fmtNum(ing.total) + " sources are reporting on time." };
+}
+
+let timer = null;
+function startCountdown() {
+  if (timer) clearInterval(timer);
+  let remaining = REFRESH_SEC;
+  const tick = () => {
+    $("countdown").textContent = remaining + "s";
+    remaining -= 1;
+    if (remaining < 0) load();
+  };
+  tick();
+  timer = setInterval(tick, 1000);
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/v1/health/full");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    $("error").hidden = true;
+    const b = bannerFor(d);
+    $("banner").className = "banner " + b.cls;
+    $("banner-text").textContent = b.text;
+    $("banner-sub").textContent  = b.sub;
+    $("stats").innerHTML  = renderStats(d);
+    $("groups").innerHTML = groupItems(d.ingesters && d.ingesters.items || [])
+                              .map(renderGroup).join("");
+    $("updated-at").textContent = fmtAbsTime(d.ts);
+    startCountdown();
+  } catch (e) {
+    $("error").hidden = false;
+    $("error").textContent = "Failed to load status: " + (e.message || e)
+      + ". Will retry shortly.";
+    setTimeout(load, 10000);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

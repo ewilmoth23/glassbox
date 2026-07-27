@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox operator console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* No framework. ~10KB total. Mac-system-font; readable on any
+     screen. Dark by default — operator-grade. */
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --dim: #6e7681;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+                 Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+    background: var(--panel);
+  }
+  header h1 { font-size: 14px; margin: 0; }
+  header .status { margin-left: auto; }
+  nav {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  nav button {
+    background: none; border: none; color: var(--muted);
+    padding: 10px 16px; cursor: pointer;
+    font: inherit; border-bottom: 2px solid transparent;
+  }
+  nav button:hover { color: var(--text); }
+  nav button.active {
+    color: var(--accent); border-bottom-color: var(--accent);
+  }
+  main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 13px; margin: 0 0 12px;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .stat {
+    padding: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .stat .label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .stat .value {
+    font-size: 20px; margin-top: 4px;
+    font-weight: 500;
+  }
+  .stat .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill.green  { background: #1b3d24; color: var(--green); }
+  .pill.yellow { background: #3d3517; color: var(--yellow); }
+  .pill.red    { background: #4a1d1c; color: var(--red); }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  th, td {
+    padding: 6px 10px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted); font-weight: 500;
+    text-transform: uppercase; font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  tr:hover td { background: rgba(88,166,255,0.05); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  input, select, button {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 10px; font: inherit;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  pre {
+    background: var(--bg); color: var(--text);
+    padding: 12px; border-radius: 4px; border: 1px solid var(--border);
+    overflow-x: auto; font-size: 12px; max-height: 400px;
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > * { flex: 0 0 auto; }
+  .row .grow { flex: 1; }
+  .muted { color: var(--muted); }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  details { margin: 8px 0; }
+  summary { cursor: pointer; color: var(--accent); }
+  .sparkline { height: 32px; width: 100%; }
+  footer {
+    padding: 16px 20px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 11px; margin-top: 32px;
+    background: var(--panel);
+  }
+  footer kbd {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 6px; font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>GLASSBOX // operator console</h1>
+  <span class="muted" id="hostInfo"></span>
+  <span class="status" id="globalStatus">
+    <span class="pill" id="statusPill">…</span>
+    <span class="muted" id="statusMeta"></span>
+  </span>
+</header>
+<nav>
+  <button class="active" data-tab="health">Health</button>
+  <button data-tab="prefilter">Prefilter</button>
+  <button data-tab="findings">Multi-entity findings</button>
+  <button data-tab="event">Event lookup</button>
+  <button data-tab="raw">Raw scrape</button>
+</nav>
+<main>
+
+<!-- ─── HEALTH TAB ─────────────────────────────────────────────────── -->
+<section class="tab active" id="tab-health">
+  <div class="panel">
+    <h2>Daemon snapshot</h2>
+    <div class="grid" id="healthGrid">
+      <div class="stat"><div class="label">status</div><div class="value muted">…</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Ingesters (26)</h2>
+    <table id="ingTable">
+      <thead><tr>
+        <th>layer</th><th>source</th><th>health</th>
+        <th class="num">tracked</th>
+        <th class="num">lag (s)</th>
+        <th class="num">cycles</th>
+        <th class="num">db writes</th>
+      </tr></thead>
+      <tbody><tr><td colspan="7" class="muted">loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─── PREFILTER TAB ─────────────────────────────────────────────── -->
+<section class="tab" id="tab-prefilter">
+  <div class="panel">
+    <h2>Prefilter live metrics</h2>
+    <div class="grid" id="prefilterGrid">
+      <div class="stat"><div class="label">pass total</div><div class="value muted">…</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Drops by rule</h2>
+    <table id="dropRuleTable">
+      <thead><tr><th>rule</th><th class="num">drops</th></tr></thead>
+      <tbody><tr><td colspan="2" class="muted">loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>A/B shadow</h2>
+    <div id="shadowSummary" class="muted">…</div>
+  </div>
+</section>
+
+<!-- ─── MULTI-ENTITY FINDINGS TAB ─────────────────────────────────── -->
+<section class="tab" id="tab-findings">
+  <div class="panel">
+    <h2>Multi-entity findings explorer (cross_domain)</h2>
+    <div class="row" style="margin-bottom: 12px;">
+      <input id="cdEntityId" placeholder="entity UUID (or 'random' to auto-pick)"
+             style="flex:1; min-width: 280px;">
+      <input id="cdHours" type="number" value="168" min="1" max="2160"
+             title="within_hours" style="width: 90px;">
+      <input id="cdLimit" type="number" value="20" min="1" max="500"
+             title="limit" style="width: 70px;">
+      <button onclick="loadCrossDomain()">Search</button>
+    </div>
+    <div id="cdResults" class="muted">Enter an entity UUID, or click random to auto-pick one with recent multi-entity findings.</div>
+  </div>
+</section>
+
+<!-- ─── EVENT LOOKUP TAB ──────────────────────────────────────────── -->
+<section class="tab" id="tab-event">
+  <div class="panel">
+    <h2>Single-event detail (event/{id})</h2>
+    <div class="row" style="margin-bottom: 12px;">
+      <input id="evId" placeholder="event UUID (or 'latest' to auto-pick)"
+             style="flex:1; min-width: 280px;">
+      <button onclick="loadEvent()">Lookup</button>
+    </div>
+    <div id="evResult" class="muted">Enter an event UUID, or click latest to auto-pick the most recent event.</div>
+  </div>
+</section>
+
+<!-- ─── RAW SCRAPE TAB ────────────────────────────────────────────── -->
+<section class="tab" id="tab-raw">
+  <div class="panel">
+    <h2>Raw Prometheus scrape (/api/v1/metrics/prefilter)</h2>
+    <pre id="rawPrefilter" class="muted">…</pre>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Press <kbd>R</kbd> to refresh now ·
+  Auto-refresh every 30s ·
+  Source: <code>21_GLASSBOX_AI/console/index.html</code> ·
+  Endpoints: <code>/api/v1/health/full</code>,
+  <code>/api/v1/metrics/prefilter</code>,
+  <code>/api/v1/event/{id}</code>,
+  <code>/api/v1/entities/{id}/cross_domain</code>
+</footer>
+
+<script>
+"use strict";
+
+// ─── State + helpers ─────────────────────────────────────────────────
+const HOST = ""; // same-origin
+const REFRESH_MS = 30000;
+let activeTab = "health";
+let refreshTimer = null;
+
+document.querySelectorAll("nav button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById("tab-" + b.dataset.tab).classList.add("active");
+    activeTab = b.dataset.tab;
+    refreshActive();
+  });
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "r" && !e.metaKey && !e.ctrlKey
+      && document.activeElement.tagName !== "INPUT") {
+    e.preventDefault();
+    refreshActive();
+  }
+});
+
+function pill(label, kind) {
+  return `<span class="pill ${kind}">${label}</span>`;
+}
+
+function statTile(label, value, sub) {
+  return `<div class="stat">
+    <div class="label">${label}</div>
+    <div class="value">${value}</div>
+    ${sub ? `<div class="sub">${sub}</div>` : ""}
+  </div>`;
+}
+
+function fmtBytes(n) {
+  if (!n && n !== 0) return "?";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+async function fetchJson(path) {
+  const r = await fetch(HOST + path);
+  if (!r.ok) throw new Error(`HTTP ${r.status} on ${path}`);
+  return await r.json();
+}
+
+async function fetchText(path) {
+  const r = await fetch(HOST + path);
+  if (!r.ok) throw new Error(`HTTP ${r.status} on ${path}`);
+  return await r.text();
+}
+
+// ─── HEALTH TAB ──────────────────────────────────────────────────────
+async function loadHealth() {
+  try {
+    const d = await fetchJson("/api/v1/health/full");
+    const ing = d.ingesters || {};
+    const counts = `
+      ${ing.ok || 0} ok ·
+      ${ing.degraded || 0} degraded ·
+      ${ing.down || 0} down ·
+      ${ing.sla_breach || 0} SLA breach`;
+    document.getElementById("statusPill").className =
+      "pill " + (d.status === "ok" ? "green"
+                 : d.status === "degraded" ? "yellow" : "red");
+    document.getElementById("statusPill").textContent = d.status || "?";
+    document.getElementById("statusMeta").textContent = counts;
+
+    const grid = document.getElementById("healthGrid");
+    grid.innerHTML =
+      statTile("ingesters",
+               `${ing.ok || 0}/${ing.total || 0}`,
+               counts.trim()) +
+      statTile("DB pool",
+               (d.db && d.db.pool_in_use !== undefined)
+                 ? `${d.db.pool_in_use}/${d.db.pool_size}`
+                 : "?",
+               "in use / size") +
+      statTile("DB up",
+               d.db && d.db.up ? "yes" : "no",
+               d.db && d.db.last_query_ms !== undefined
+                 ? `${Math.round(d.db.last_query_ms)} ms last query`
+                 : "") +
+      statTile("findings (5m / 60m)",
+               `${(d.findings || {}).count_5m || 0} / ${(d.findings || {}).count_60m || 0}`,
+               "from algorithms");
+
+    const items = ing.items || [];
+    const tbody = document.querySelector("#ingTable tbody");
+    tbody.innerHTML = items.map(i => {
+      const healthCls = i.health === "ok" ? "green"
+                       : i.health === "degraded" ? "yellow" : "red";
+      return `<tr>
+        <td>${i.layer || ""}</td>
+        <td class="muted">${(i.source || "").substring(0, 60)}</td>
+        <td>${pill(i.health || "?", healthCls)}${
+            i.sla_breach ? " " + pill("sla", "red") : ""}</td>
+        <td class="num">${(i.tracked_entities || 0).toLocaleString()}</td>
+        <td class="num">${i.secs_since_last_fetch ?? "—"}</td>
+        <td class="num">${i.cycles_run || 0}${
+            i.cycles_failed ? `<span class="muted"> (${i.cycles_failed} fail)</span>` : ""}</td>
+        <td class="num">${(i.last_db_write_count || 0).toLocaleString()}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="7" class="muted">no ingesters</td></tr>`;
+  } catch (e) {
+    document.getElementById("statusPill").className = "pill red";
+    document.getElementById("statusPill").textContent = "error";
+    document.getElementById("statusMeta").textContent = e.message;
+  }
+}
+
+// ─── PREFILTER TAB ───────────────────────────────────────────────────
+async function loadPrefilter() {
+  try {
+    const txt = await fetchText("/api/v1/metrics/prefilter");
+
+    // Show raw scrape on its own tab
+    document.getElementById("rawPrefilter").textContent = txt;
+
+    if (txt.startsWith("# prefilter metrics disabled")) {
+      document.getElementById("prefilterGrid").innerHTML =
+        `<div class="muted">${txt.trim()}</div>`;
+      document.getElementById("shadowSummary").innerHTML =
+        `<div class="muted">disabled</div>`;
+      return;
+    }
+
+    // Parse the simple metric format
+    const metrics = {};
+    const labelMetrics = {};
+    txt.split("\n").forEach(line => {
+      if (!line || line.startsWith("#")) return;
+      const m = line.match(/^([a-z_]+)(\{[^}]*\})?\s+([\d.eE+-]+)/);
+      if (!m) return;
+      const [, name, labels, val] = m;
+      if (labels) {
+        if (!labelMetrics[name]) labelMetrics[name] = [];
+        const labelObj = {};
+        labels.replace(/[{}]/g, "").split(",").forEach(kv => {
+          const [k, v] = kv.split("=");
+          if (k) labelObj[k.trim()] = (v || "").replace(/^"|"$/g, "");
+        });
+        labelMetrics[name].push({ labels: labelObj, value: parseFloat(val) });
+      } else {
+        metrics[name] = parseFloat(val);
+      }
+    });
+
+    const passT  = metrics.glassbox_prefilter_pass_total || 0;
+    const dropT  = (labelMetrics.glassbox_prefilter_drop_total || [])
+                    .reduce((s, x) => s + x.value, 0);
+    const total  = passT + dropT;
+    const passRate = total > 0 ? ((passT / total) * 100).toFixed(2) + "%" : "—";
+    const qDepth = metrics.glassbox_prefilter_queue_depth || 0;
+    const qMax   = metrics.glassbox_prefilter_queue_max_depth || 0;
+    const qPct   = qMax > 0 ? ((qDepth / qMax) * 100).toFixed(1) + "%" : "—";
+    const tailDrop = metrics.glassbox_prefilter_queue_tail_dropped_total || 0;
+    const newDrop  = metrics.glassbox_prefilter_queue_new_event_dropped_total || 0;
+
+    document.getElementById("prefilterGrid").innerHTML =
+      statTile("pass total", passT.toLocaleString(),
+               `since daemon start`) +
+      statTile("drop total", dropT.toLocaleString(),
+               total > 0 ? `${(dropT / total * 100).toFixed(1)}% of seen` : "—") +
+      statTile("pass rate", passRate, "pass / (pass + drop)") +
+      statTile("queue depth", `${qDepth} / ${qMax}`,
+               qPct + " full") +
+      statTile("queue overflow",
+               (tailDrop + newDrop).toLocaleString(),
+               `${tailDrop} tail + ${newDrop} new-event`);
+
+    // Drops by rule
+    const byRule = labelMetrics.glassbox_prefilter_drop_total || [];
+    const tbody = document.querySelector("#dropRuleTable tbody");
+    tbody.innerHTML = byRule
+      .sort((a, b) => b.value - a.value)
+      .map(r => `<tr>
+        <td>${r.labels.rule || "?"}</td>
+        <td class="num">${r.value.toLocaleString()}</td>
+      </tr>`).join("") ||
+      `<tr><td colspan="2" class="muted">no drops yet</td></tr>`;
+
+    // Shadow A/B summary
+    const shadowOutcomes = labelMetrics.glassbox_prefilter_shadow_outcome_total || [];
+    const totalShadow = shadowOutcomes.reduce((s, x) => s + x.value, 0);
+    if (totalShadow > 0) {
+      const map = {};
+      shadowOutcomes.forEach(o => map[o.labels.outcome] = o.value);
+      const agree = (map.agree_pass || 0) + (map.agree_drop || 0);
+      const agreement = (agree / totalShadow * 100).toFixed(2) + "%";
+      const shadowPass = ((map.agree_pass || 0) + (map.primary_drop_only || 0));
+      const shadowPassRate = (shadowPass / totalShadow * 100).toFixed(2) + "%";
+      const primaryPass = ((map.agree_pass || 0) + (map.primary_pass_only || 0));
+      const primaryPassRate = (primaryPass / totalShadow * 100).toFixed(2) + "%";
+      document.getElementById("shadowSummary").innerHTML = `
+        <div class="grid">
+          ${statTile("agreement rate", agreement, "(agree_pass + agree_drop) / total")}
+          ${statTile("primary pass rate", primaryPassRate, "today")}
+          ${statTile("shadow pass rate", shadowPassRate, "if shadow promoted")}
+          ${statTile("Δ pass rate",
+                     `${shadowPass > primaryPass ? "+" : ""}${(shadowPassRate - primaryPassRate).toFixed(2) || "0"}%`,
+                     "shadow − primary")}
+        </div>
+        <h2 style="margin-top:16px;">Confusion matrix</h2>
+        <table>
+          <thead><tr><th>outcome</th><th class="num">count</th><th class="num">% of total</th></tr></thead>
+          <tbody>
+            ${["agree_pass", "agree_drop", "primary_pass_only", "primary_drop_only"]
+              .map(k => `<tr>
+                <td>${k}</td>
+                <td class="num">${(map[k] || 0).toLocaleString()}</td>
+                <td class="num">${((map[k] || 0) / totalShadow * 100).toFixed(2)}%</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    } else {
+      document.getElementById("shadowSummary").innerHTML =
+        `<div class="muted">A/B shadow inactive — set
+         <code>GLASSBOX_PREFILTER_SHADOW_CONFIG</code> + reload daemon
+         to enable. Sandbox config at
+         <code>21_GLASSBOX_AI/ingesters/gdelt_bulk/prefilter/config/prefilter_shadow_example.yaml</code>.</div>`;
+    }
+  } catch (e) {
+    document.getElementById("prefilterGrid").innerHTML =
+      `<div class="stat"><div class="label">error</div><div class="value">${e.message}</div></div>`;
+  }
+}
+
+// ─── CROSS_DOMAIN TAB ───────────────────────────────────────────────
+async function loadCrossDomain() {
+  let id = document.getElementById("cdEntityId").value.trim();
+  const hours = document.getElementById("cdHours").value;
+  const limit = document.getElementById("cdLimit").value;
+  const out = document.getElementById("cdResults");
+  out.className = "muted";
+
+  if (!id || id === "random") {
+    // Pick a random entity from a recent multi-entity event
+    out.innerHTML = `<div class="muted">picking a random multi-entity entity from recent events…</div>`;
+    try {
+      // Use the events.in_bbox-like /viewport call to find recent rendezvous
+      const v = await fetchJson(
+        "/api/v1/viewport?bbox=-180,-90,180,90"
+        + "&time_from=" + new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+        + "&time_to=" + new Date().toISOString()
+        + "&types=infrastructure&limit=200"
+      );
+      const events = (v.events || []).filter(e =>
+        e.properties && e.properties.entity_ids
+        && e.properties.entity_ids.length >= 2);
+      if (!events.length) {
+        out.innerHTML = `<div class="muted">no multi-entity events in the last 24h.</div>`;
+        return;
+      }
+      const ev = events[Math.floor(Math.random() * events.length)];
+      id = ev.properties.entity_ids[0];
+      document.getElementById("cdEntityId").value = id;
+    } catch (e) {
+      out.innerHTML = `<div class="muted">error finding random entity: ${e.message}</div>`;
+      return;
+    }
+  }
+
+  out.innerHTML = `<div class="muted">loading cross_domain for ${id}…</div>`;
+  try {
+    const d = await fetchJson(
+      `/api/v1/entities/${id}/cross_domain?within_hours=${hours}&limit=${limit}`);
+    if (!d.events || !d.events.length) {
+      out.innerHTML = `<div class="muted">no multi-entity findings for entity
+        <code>${id}</code> in the last ${hours} hours.</div>`;
+      return;
+    }
+    out.className = "";
+    out.innerHTML = `
+      <div class="grid" style="margin-bottom:16px;">
+        ${statTile("entity", `<code style="font-size:11px;">${id}</code>`)}
+        ${statTile("findings", d.events.length.toLocaleString(),
+                   `within ${d.within_hours}h`)}
+        ${statTile("unique partners",
+                   new Set(d.events.flatMap(e => (e.partners || []).map(p => p.entity_id))).size.toLocaleString(),
+                   "across all findings")}
+      </div>
+      <table>
+        <thead><tr>
+          <th>event_type</th><th>severity</th><th>when</th>
+          <th>partners</th><th>title</th>
+        </tr></thead>
+        <tbody>
+          ${d.events.map(e => `<tr>
+            <td>${e.event_type}</td>
+            <td>${e.severity ?? "—"}</td>
+            <td class="muted">${e.event_time || ""}</td>
+            <td>${(e.partners || []).map(p =>
+              `<div style="margin-bottom:2px;">
+                <span class="muted">${p.entity_type}</span>
+                <code style="font-size:11px;">${p.canonical_id || p.entity_id.substring(0,8)}</code>
+                ${p.display_name ? ` <em>${p.display_name}</em>` : ""}
+              </div>`).join("") || "—"}</td>
+            <td class="muted">${(e.title || "").substring(0, 80)}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    out.innerHTML = `<div class="muted">error: ${e.message}</div>`;
+  }
+}
+
+// ─── EVENT LOOKUP TAB ───────────────────────────────────────────────
+async function loadEvent() {
+  let id = document.getElementById("evId").value.trim();
+  const out = document.getElementById("evResult");
+  out.className = "muted";
+
+  if (!id || id === "latest") {
+    out.innerHTML = `<div class="muted">picking the most recent event…</div>`;
+    try {
+      // Use /viewport for global last-hour to grab any recent event
+      const v = await fetchJson(
+        "/api/v1/viewport?bbox=-180,-90,180,90"
+        + "&time_from=" + new Date(Date.now() - 3600 * 1000).toISOString()
+        + "&time_to=" + new Date().toISOString()
+        + "&types=infrastructure&limit=1"
+      );
+      if (!v.events || !v.events.length) {
+        out.innerHTML = `<div class="muted">no events in the last hour.</div>`;
+        return;
+      }
+      id = v.events[0].id;
+      document.getElementById("evId").value = id;
+    } catch (e) {
+      out.innerHTML = `<div class="muted">error finding latest event: ${e.message}</div>`;
+      return;
+    }
+  }
+
+  out.innerHTML = `<div class="muted">loading event ${id}…</div>`;
+  try {
+    const d = await fetchJson(`/api/v1/event/${id}`);
+    out.className = "";
+    out.innerHTML = `
+      <div class="grid" style="margin-bottom:16px;">
+        ${statTile("event_type", d.event_type, d.event_subtype || "")}
+        ${statTile("severity", d.severity ?? "—", d.severity_for_market ? "market: " + d.severity_for_market : "")}
+        ${statTile("when", d.event_time, "")}
+        ${statTile("location",
+                   d.lat !== null && d.lng !== null
+                     ? `${d.lat.toFixed(3)}, ${d.lng.toFixed(3)}` : "—",
+                   d.domain || "")}
+      </div>
+      <h2 style="font-size:13px; color:var(--accent); margin:0 0 8px;">TITLE</h2>
+      <p>${d.title || "<em>no title</em>"}</p>
+      <h2 style="font-size:13px; color:var(--accent); margin:16px 0 8px;">DESCRIPTION</h2>
+      <p>${d.description || "<em>no description</em>"}</p>
+      <details>
+        <summary>raw properties JSON</summary>
+        <pre>${JSON.stringify(d.properties || {}, null, 2)}</pre>
+      </details>`;
+  } catch (e) {
+    out.innerHTML = `<div class="muted">error: ${e.message}</div>`;
+  }
+}
+
+// ─── Refresh dispatch ───────────────────────────────────────────────
+async function refreshActive() {
+  if (activeTab === "health") await loadHealth();
+  else if (activeTab === "prefilter") await loadPrefilter();
+  else if (activeTab === "raw") {
+    try {
+      const txt = await fetchText("/api/v1/metrics/prefilter");
+      document.getElementById("rawPrefilter").textContent = txt;
+    } catch (e) {
+      document.getElementById("rawPrefilter").textContent = "error: " + e.message;
+    }
+  }
+  // findings + event tabs are user-driven (button-click); don't auto-poll
+}
+
+// Boot
+loadHealth();
+loadPrefilter();
+refreshTimer = setInterval(refreshActive, REFRESH_MS);
+document.getElementById("hostInfo").textContent = location.host;
+</script>
+</body>
+</html>

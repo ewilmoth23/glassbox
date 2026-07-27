@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox · Pricing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Glassbox pricing — Free public dashboard, Pro live alerts + email digest, Team API access + private watchlists. Algorithm-derived OSINT intelligence.">
+<meta name="theme-color" content="#05080d">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="canonical" href="https://mewrcreate.com/pricing">
+
+<meta property="og:type" content="website">
+<meta property="og:url"  content="https://mewrcreate.com/pricing">
+<meta property="og:title" content="Glassbox · Pricing">
+<meta property="og:description" content="Free public dashboard, Pro live alerts, Team API access. Algorithm-derived OSINT intelligence on a 3D globe.">
+<meta property="og:image" content="https://mewrcreate.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://mewrcreate.com/og-image.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --void: #02040a;
+  --space: #05080d;
+  --abyss: #080d18;
+  --surface: rgba(14, 19, 32, 0.72);
+  --surface-2: rgba(14, 19, 32, 0.92);
+  --rule: rgba(255, 255, 255, 0.06);
+  --rule-hi: rgba(255, 255, 255, 0.14);
+  --text: #e9ecf2;
+  --text-soft: #b6bcc8;
+  --muted: #6a7383;
+  --gold: #ffb547;
+  --gold-soft: rgba(255, 181, 71, 0.16);
+  --gold-glow: 0 0 20px rgba(255, 181, 71, 0.35);
+  --cyan: #7fd0ff;
+  --cyan-soft: rgba(127, 208, 255, 0.18);
+  --crit: #ff5b5b;
+  --display: "Geist", -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--void); color: var(--text); font: 14px/1.5 var(--display); -webkit-font-smoothing: antialiased; }
+a { color: var(--cyan); text-decoration: none; transition: color .2s; }
+a:hover { color: var(--gold); }
+
+/* Top nav */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 28px;
+  background: rgba(2,4,10,0.85);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--rule);
+}
+.brand-mark { display: flex; align-items: baseline; gap: 12px; text-decoration: none; }
+.brand-mark .glyph {
+  width: 22px; height: 22px;
+  background: radial-gradient(circle at 30% 30%, var(--gold), #c87a1a 70%, transparent 75%);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(255,181,71,0.55);
+  position: relative;
+}
+.brand-mark .glyph::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--space); }
+.brand-mark .name { font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: 0.02em; color: var(--text); }
+.brand-mark .name .em { color: var(--gold); }
+.topbar nav { margin-left: auto; display: flex; gap: 22px; }
+.topbar nav a { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+.topbar nav a:hover { color: var(--gold); }
+.topbar nav a.cta {
+  color: var(--space); background: var(--gold);
+  padding: 6px 14px; border-radius: 4px; font-weight: 700;
+}
+.topbar nav a.cta:hover { background: #ffc870; color: var(--space); }
+
+/* Hero */
+.hero {
+  padding: 80px 28px 60px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 50% 50%, var(--abyss) 0%, var(--void) 70%);
+  border-bottom: 1px solid var(--rule);
+}
+.hero .eyebrow {
+  font-family: var(--mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.20em;
+  color: var(--gold); margin-bottom: 14px;
+}
+.hero h1 {
+  font-family: var(--display);
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700;
+  margin: 0 0 18px;
+  letter-spacing: -0.01em;
+}
+.hero h1 .em { color: var(--gold); }
+.hero p {
+  max-width: 640px; margin: 0 auto;
+  font-size: 17px; color: var(--text-soft); line-height: 1.6;
+}
+
+/* Plans grid */
+.plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 22px;
+  max-width: 1180px;
+  margin: 60px auto;
+  padding: 0 28px;
+}
+.plan {
+  background: var(--surface-2);
+  border: 1px solid var(--rule-hi);
+  border-radius: 8px;
+  padding: 32px 28px;
+  display: flex; flex-direction: column;
+  position: relative;
+  transition: border-color .25s, transform .25s;
+}
+.plan:hover { border-color: rgba(255,181,71,0.25); transform: translateY(-2px); }
+.plan.featured {
+  border-color: var(--gold);
+  box-shadow: var(--gold-glow);
+}
+.plan.featured::before {
+  content: "MOST POPULAR";
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  background: var(--gold); color: var(--space);
+  padding: 4px 14px; border-radius: 3px;
+  font-family: var(--mono); font-size: 9px;
+  font-weight: 700; letter-spacing: 0.18em;
+}
+.plan .tier {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.plan .price {
+  font-family: var(--display);
+  font-size: 44px; font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 6px 0;
+}
+.plan .price .unit {
+  font-family: var(--mono); font-size: 13px;
+  font-weight: 400; color: var(--muted);
+  margin-left: 4px;
+  text-transform: uppercase; letter-spacing: 0.12em;
+}
+.plan .price.free { color: var(--cyan); }
+.plan .price.pro  { color: var(--gold); }
+.plan .price.team { color: var(--text); }
+.plan .blurb {
+  font-size: 13px; color: var(--text-soft);
+  margin: 4px 0 24px; line-height: 1.5;
+  min-height: 40px;
+}
+.plan ul { list-style: none; padding: 0; margin: 0 0 26px; flex: 1; }
+.plan li {
+  font-size: 13px; color: var(--text-soft);
+  padding: 7px 0 7px 22px;
+  position: relative; line-height: 1.5;
+  border-bottom: 1px dashed var(--rule);
+}
+.plan li:last-child { border-bottom: 0; }
+.plan li::before {
+  content: "✓"; position: absolute; left: 0; top: 7px;
+  color: var(--gold); font-weight: 700;
+}
+.plan li.muted { color: var(--muted); }
+.plan li.muted::before { content: "—"; color: var(--muted); }
+.plan .cta {
+  display: block; text-align: center;
+  padding: 12px 16px;
+  font-family: var(--mono); font-size: 12px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+  border-radius: 5px;
+  border: 1px solid var(--rule-hi);
+  background: transparent; color: var(--text);
+  cursor: pointer; transition: all .25s;
+  text-decoration: none;
+}
+.plan .cta:hover { border-color: var(--gold); color: var(--gold); }
+.plan.featured .cta {
+  background: var(--gold); color: var(--space); border-color: var(--gold);
+}
+.plan.featured .cta:hover { background: #ffc870; color: var(--space); }
+
+/* Waitlist banner */
+.waitlist-note {
+  max-width: 880px; margin: 0 auto 60px; padding: 24px 28px;
+  background: var(--surface);
+  border: 1px solid var(--gold-soft);
+  border-radius: 6px;
+  font-size: 13px; line-height: 1.6;
+  color: var(--text-soft);
+  text-align: center;
+}
+.waitlist-note strong { color: var(--gold); }
+
+/* FAQ */
+.faq {
+  max-width: 800px; margin: 60px auto;
+  padding: 0 28px;
+}
+.faq h2 {
+  font-family: var(--display); font-size: 28px;
+  font-weight: 700; margin-bottom: 30px;
+  text-align: center;
+}
+.faq-item {
+  border-bottom: 1px solid var(--rule);
+  padding: 22px 0;
+}
+.faq-item h3 {
+  margin: 0 0 8px; font-size: 16px; color: var(--text);
+}
+.faq-item p {
+  margin: 0; color: var(--text-soft); font-size: 14px; line-height: 1.6;
+}
+
+/* Footer */
+footer {
+  padding: 40px 28px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); text-align: center;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+footer a { color: var(--text-soft); margin: 0 10px; }
+
+/* Inline waitlist form (shown after CTA click) */
+.wl-modal {
+  position: fixed; inset: 0;
+  background: rgba(2,4,10,0.85);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.wl-modal.open { display: flex; }
+.wl-modal .card {
+  background: var(--surface-2);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 36px;
+  max-width: 440px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+.wl-modal h3 {
+  font-family: var(--display); font-size: 24px;
+  margin: 0 0 8px; color: var(--gold);
+}
+.wl-modal p { color: var(--text-soft); font-size: 14px; line-height: 1.6; margin: 0 0 22px; }
+.wl-modal input {
+  width: 100%; padding: 12px 14px;
+  background: var(--space); color: var(--text);
+  border: 1px solid var(--rule-hi); border-radius: 4px;
+  font-family: var(--mono); font-size: 13px;
+  margin-bottom: 16px;
+}
+.wl-modal input:focus { outline: none; border-color: var(--gold); }
+.wl-modal button {
+  width: 100%; padding: 12px;
+  background: var(--gold); color: var(--space);
+  border: 0; border-radius: 4px;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  cursor: pointer;
+}
+.wl-modal button:hover { background: #ffc870; }
+.wl-modal button:disabled { opacity: 0.5; cursor: wait; }
+.wl-modal .close {
+  background: transparent; color: var(--muted);
+  font-family: var(--display); font-size: 13px; font-weight: 400;
+  text-transform: none; letter-spacing: normal; padding: 8px;
+  margin-top: 8px;
+}
+.wl-modal .ok-msg { color: var(--cyan); margin-top: 12px; font-size: 13px; }
+.wl-modal .err-msg { color: var(--crit); margin-top: 12px; font-size: 13px; }
+</style>
+<script src="/track.js" async></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand-mark">
+    <span class="glyph"></span>
+    <span class="name">GLASS<span class="em">BOX</span></span>
+  </a>
+  <nav>
+    <a href="/">Cockpit</a>
+    <a href="/signals">Signals</a>
+    <a href="/monitor">Monitor</a>
+    <a href="/docs">API</a>
+    <a href="/pricing" class="cta">Pricing</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">Pricing · early access</div>
+  <h1>Built for analysts.<br>Priced for <span class="em">teams that ship.</span></h1>
+  <p>Algorithm-derived OSINT intelligence — sanctioned-vessel tracking, restricted-airspace alerts, shadow-fleet detection, country-intel heat. Live on a 3D globe and shipped to your inbox.</p>
+</section>
+
+<div class="plans">
+  <div class="plan">
+    <div class="tier">Free</div>
+    <div class="price free">$0<span class="unit">forever</span></div>
+    <p class="blurb">The full live cockpit. Public sources, public dashboard.</p>
+    <ul>
+      <li>Live 3D globe + 14 layers</li>
+      <li>2,500 vessels + 2,500 aircraft live</li>
+      <li>Country intel heatmap</li>
+      <li>97 satellites (SGP4)</li>
+      <li>Public RSS / JSON Feed / CSV exports</li>
+      <li class="muted">No email digest</li>
+      <li class="muted">No API access</li>
+      <li class="muted">No private watchlists</li>
+    </ul>
+    <a href="/" class="cta">Open the cockpit →</a>
+  </div>
+
+  <div class="plan featured">
+    <div class="tier">Pro</div>
+    <div class="price pro">$49<span class="unit">/mo</span></div>
+    <p class="blurb">Everything in Free, plus daily intel digest + push alerts.</p>
+    <ul>
+      <li>Daily email digest at 7am ET</li>
+      <li>Per-region severity filters</li>
+      <li>Custom watchlists (vessels / airspace / region)</li>
+      <li>Push alerts on critical fires (Slack / email)</li>
+      <li>30-day full event history</li>
+      <li>Embedded widget for your site</li>
+      <li class="muted">No API rate-limit lift</li>
+      <li class="muted">Single user</li>
+    </ul>
+    <button class="cta" data-waitlist="pro" data-price="49">Join waitlist · Pro</button>
+  </div>
+
+  <div class="plan">
+    <div class="tier">Team</div>
+    <div class="price team">$199<span class="unit">/mo</span></div>
+    <p class="blurb">Pro for up to 10 seats + REST API + private deployments.</p>
+    <ul>
+      <li>Everything in Pro, ×10 seats</li>
+      <li>Full REST API + Webhooks (50K req/day)</li>
+      <li>Custom domain (your-name.glassbox.app)</li>
+      <li>Splink alias-cluster API</li>
+      <li>Cross-domain entity-graph queries</li>
+      <li>Priority Slack support</li>
+      <li>1-yr full event history</li>
+      <li>SSO (SAML / OIDC) on request</li>
+    </ul>
+    <button class="cta" data-waitlist="team" data-price="199">Join waitlist · Team</button>
+  </div>
+
+  <div class="plan">
+    <div class="tier">Enterprise</div>
+    <div class="price team">Custom</div>
+    <p class="blurb">Self-hosted, private data sources, custom algorithms.</p>
+    <ul>
+      <li>Self-hosted on your infrastructure</li>
+      <li>Private data source integration (your AIS feeds, your watchlists)</li>
+      <li>Custom algorithm development</li>
+      <li>SLA contract + named support engineer</li>
+      <li>Audit logs + SOC2 path</li>
+      <li>Air-gap deployment available</li>
+    </ul>
+    <button class="cta" data-waitlist="enterprise" data-price="0">Contact sales →</button>
+  </div>
+</div>
+
+<div class="waitlist-note">
+  <strong>Why a waitlist?</strong> Pro and Team are launching to a first cohort once we close the first 50 seats — that lets us tune live alert thresholds against real watchlists before opening the gates. <strong>Free tier is live right now</strong> — no waitlist, just <a href="/">open the cockpit</a>.
+</div>
+
+<section class="faq">
+  <h2>FAQ</h2>
+  <div class="faq-item">
+    <h3>Where does the data come from?</h3>
+    <p>26+ public OSINT sources: AIS for vessels (AISStream), ADS-B for aircraft (adsb.lol), OFAC/EU CFSP/UK OFSI consolidated sanctions, NASA FIRMS for wildfires, USGS for earthquakes, GDELT for news, EONET for natural events, NOAA SWPC for space weather, Natural Earth for boundaries. Full registry at <a href="/api/sources">/api/sources</a>.</p>
+  </div>
+  <div class="faq-item">
+    <h3>Is this just rebadged worldmonitor / globalthreatmap?</h3>
+    <p>No. Both of those are AGPL — we read them for design patterns and ship 100% original code. The 9 algorithms (sanctioned-dark detection, shadow-fleet clustering, port-arrival matching, multi-juris cross-checks, etc.) are written from scratch and run on-prem. Nothing is copied.</p>
+  </div>
+  <div class="faq-item">
+    <h3>What's the SLA?</h3>
+    <p>Free tier is best-effort (currently 99.5% over the past 30 days, see <a href="/status">live status</a>). Team plan is 99.9% with a 1-month credit on miss. Enterprise is a contracted SLA with 4-hour response.</p>
+  </div>
+  <div class="faq-item">
+    <h3>Can I export the data?</h3>
+    <p>Free: RSS, JSON Feed, CSV (up to 5,000 rows). Pro: same plus 30-day historical CSV exports. Team: REST API, webhooks, Parquet exports for analytics, full historical (1 year). Enterprise: anything you need.</p>
+  </div>
+  <div class="faq-item">
+    <h3>Is the AI brief actually useful or LLM filler?</h3>
+    <p>It's a deterministic summary of the past hour's algorithm fires (event count + categories + top 5 entities) followed by an Ollama qwen2.5:14b-generated 3-line analyst note. Runs entirely on-prem (no OpenAI). The deterministic part is the load-bearing one; the LLM adds tone.</p>
+  </div>
+</section>
+
+<footer>
+  © 2026 MEWR Creative Enterprises LLC ·
+  <a href="/status">System status</a> ·
+  <a href="/docs">API docs</a> ·
+  <a href="/signals.rss">RSS</a> ·
+  <a href="mailto:contact@mewrcreate.com">Contact</a>
+</footer>
+
+<!-- Waitlist modal -->
+<div class="wl-modal" id="wl-modal" role="dialog" aria-labelledby="wl-title">
+  <div class="card">
+    <h3 id="wl-title">Join the <span id="wl-tier-label">Pro</span> waitlist</h3>
+    <p>You'll get one email when the cohort opens — with a 30% early-bird discount on first month. No spam, unsubscribe anytime.</p>
+    <input type="email" id="wl-email" placeholder="you@company.com" autocomplete="email">
+    <button id="wl-submit">Join waitlist</button>
+    <button class="close" id="wl-close">Cancel</button>
+    <div id="wl-result"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const modal = $('wl-modal');
+let currentTier = 'pro';
+
+document.querySelectorAll('button[data-waitlist]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentTier = btn.dataset.waitlist;
+    $('wl-tier-label').textContent = currentTier.charAt(0).toUpperCase() + currentTier.slice(1);
+    $('wl-result').innerHTML = '';
+    $('wl-email').value = '';
+    modal.classList.add('open');
+    setTimeout(() => $('wl-email').focus(), 100);
+  });
+});
+$('wl-close').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.classList.remove('open'); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') modal.classList.remove('open'); });
+
+$('wl-submit').addEventListener('click', async () => {
+  const email = $('wl-email').value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    $('wl-result').innerHTML = '<div class="err-msg">Enter a valid email address.</div>';
+    return;
+  }
+  const btn = $('wl-submit');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  try {
+    const resp = await fetch('/api/v1/signals/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        severity_floor: 'critical',
+        source: 'pricing-' + currentTier,
+      }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      $('wl-result').innerHTML = '<div class="ok-msg">✓ You\'re on the list. Check your inbox to confirm.</div>';
+      btn.textContent = 'Done';
+      // First-party conversion attribution — source = pricing-{tier}
+      if (window.gbtrack) window.gbtrack('waitlist_signup', { tier: currentTier });
+      setTimeout(() => modal.classList.remove('open'), 2400);
+    } else if (resp.status === 429) {
+      $('wl-result').innerHTML = '<div class="err-msg">Too many signups from your network. Try again in a few minutes.</div>';
+      btn.disabled = false;
+      btn.textContent = 'Join waitlist';
+    } else {
+      $('wl-result').innerHTML = `<div class="err-msg">${(data && data.detail) || 'Something went wrong. Try again or email contact@mewrcreate.com.'}</div>`;
+      btn.disabled = false;
+      btn.textContent = 'Join waitlist';
+    }
+  } catch (e) {
+    $('wl-result').innerHTML = '<div class="err-msg">Network error. Try again.</div>';
+    btn.disabled = false;
+    btn.textContent = 'Join waitlist';
+  }
+});
+</script>
+
+</body>
+</html>

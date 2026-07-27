@@ -1,0 +1,66 @@
+# Glassbox observability stack — turnkey docker-compose.
+# ─────────────────────────────────────────────────────────────────────
+# Two services:
+#   - prometheus  — scrapes /api/v1/metrics{,/prefilter} on the Mac host.
+#   - grafana     — UI on http://localhost:3000 (admin / admin first run).
+#
+# Storage: prometheus_data + grafana_data named volumes (Docker-managed,
+# persist across container restarts; survive `docker compose down`,
+# wiped by `docker compose down -v`).
+#
+# Bring up:
+#   cd 21_GLASSBOX_AI/ops/prometheus
+#   docker compose up -d
+#
+# Tear down:
+#   docker compose down            # keep data
+#   docker compose down -v         # wipe data
+#
+# Logs:
+#   docker compose logs -f prometheus
+#   docker compose logs -f grafana
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: glassbox-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+      - --web.enable-admin-api
+    extra_hosts:
+      # On Linux, host.docker.internal isn't auto-resolved.
+      # Mac/Windows already provide it. Harmless on Mac.
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: glassbox-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana_provisioning:/etc/grafana/provisioning:ro
+      # Mount the canonical dashboard JSON directly so edits to the
+      # source file propagate without copy-paste.
+      - ../grafana:/etc/grafana/provisioning/dashboards/files:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:

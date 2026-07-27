@@ -1,0 +1,48 @@
+# Glassbox V2 server dependencies.
+# Install on the Mac Mini with:
+#   pip3 install --break-system-packages -r 21_GLASSBOX_AI/requirements.txt
+
+fastapi>=0.110
+uvicorn>=0.29
+sse-starlette>=2.1
+aiohttp>=3.9
+sgp4>=2.23
+
+# Phase 1 (2026-05-07) — Postgres durable-archive backbone
+asyncpg>=0.29
+python-dotenv>=1.0
+pytest>=8.0
+pytest-asyncio>=0.23
+# pytest-timeout — per-test wall-clock cap. P0-F's first run hung on a
+# CLOSE_WAIT HTTPS socket for 6+ hours; --timeout=30 keeps a slow test
+# bounded instead of forever. Required for `pytest --timeout=N` to be
+# recognized — without it pytest errors out with "unrecognized
+# arguments: --timeout=30".
+pytest-timeout>=2.3
+# pytest-xdist — parallel test runs (`pytest -n auto`). Not used today
+# (suite is 33s sequential after P0-F.3) but cheap to lock so a fresh
+# venv has it available when the suite grows.
+pytest-xdist>=3.5
+pyyaml>=6.0
+
+# Phase 4.B (2026-05-10) — schema-validated LLM-JSON parsing.
+# Used today at the Pydantic-schema layer in 21_GLASSBOX_AI/llm_json.py
+# (forecaster + intelligence_loop SITREP). Full outlines.from_openai
+# wrapping for grammar-constrained generation requires switching the
+# existing Ollama /api/generate call sites to /v1/chat/completions —
+# scoped as a follow-up. License: Apache-2.0 (LICENSE_RISK_REGISTER §1.3).
+outlines>=0.0.40
+
+# R6 (2026-05-10) — FollowTheMoney schema bridge for OCCRP /
+# OpenSanctions ecosystem interoperability. Outbound translator at
+# 21_GLASSBOX_AI/ftm.py exposes empire entity rows in FtM JSON shape
+# (Vessel / Airplane today). License: MIT (LICENSE_RISK_REGISTER §1.3).
+followthemoney>=3.6
+
+# HANDOFF_03 Day-3 (2026-05-10 continuation) — Prometheus metrics
+# shim for the prefilter rule chain so operators can chart per-rule
+# pass / drop rates and queue depth over time. Imported lazily by
+# 21_GLASSBOX_AI/ingesters/gdelt_bulk/prefilter/metrics.py — the
+# rest of the codebase has no compile-time dep on this. License:
+# Apache-2.0 (LICENSE_RISK_REGISTER §1.3).
+prometheus-client>=0.20

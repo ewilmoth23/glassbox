@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox — Monitor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Glassbox MONITOR — live global situational awareness: vessels, aircraft, conflicts, sanctions, fires, quakes.">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" crossorigin="">
+<style>
+  /* ───────────────────────────────────────────────────────────────────
+     Glassbox Monitor — terminal-grade dark UI inspired by reference
+     dashboards (worldmonitor.app, crucix.live). Built fresh; no copied
+     code. Same palette family + grid system but rewritten clean.
+     ─────────────────────────────────────────────────────────────────── */
+  :root {
+    --bg:        #0b0e14;
+    --bg-soft:   #0f131c;
+    --panel:     #11151f;
+    --border:    rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text:      #e6edf3;
+    --muted:     #7a8597;
+    --accent:    #58a6ff;
+    --accent-2:  #79c0ff;
+
+    --critical:  #ff4d6a;
+    --high:      #ffa657;
+    --medium:    #d4c43a;
+    --low:       #3fb950;
+
+    --critical-bg: rgba(255,77,106,0.12);
+    --high-bg:     rgba(255,166,87,0.12);
+    --medium-bg:   rgba(212,196,58,0.12);
+    --low-bg:      rgba(63,185,80,0.12);
+
+    --pin-vessel:   #58a6ff;
+    --pin-aircraft: #c08bff;
+    --pin-fire:     #ff7b3a;
+    --pin-quake:    #d4c43a;
+    --pin-sanction: #ff4d6a;
+    --pin-event:    #ffa657;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.45 ui-monospace, "SF Mono", "JetBrains Mono",
+          "Fira Code", Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-2); }
+
+  /* ─── Layout grid ─────────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-rows: 44px 1fr 220px 28px;
+    grid-template-columns: 280px 1fr 360px;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "left   map    right"
+      "left   strip  right"
+      "status status status";
+    height: 100vh;
+  }
+  .app.no-strip {
+    grid-template-rows: 44px 1fr 0 28px;
+  }
+  .app.no-strip .strip { display: none; }
+  .right.collapsed { display: none; }
+  .app.no-right { grid-template-columns: 280px 1fr 0; }
+
+  /* ─── Top bar ─────────────────────────────────────────────────────── */
+  .topbar {
+    grid-area: topbar;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 14px;
+  }
+  .brand {
+    font-weight: 700; font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--text);
+  }
+  .brand .v { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 11px; }
+  .nav { display: flex; gap: 4px; }
+  .nav a {
+    padding: 5px 12px; border-radius: 4px;
+    color: var(--muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .nav a:hover { background: var(--bg-soft); color: var(--text); }
+  .nav a.active { background: var(--bg-soft); color: var(--accent); }
+
+  .topbar .live {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: auto; padding: 4px 10px; border-radius: 4px;
+    background: var(--low-bg); color: var(--low);
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .live::before {
+    content: ""; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: currentColor;
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  .defcon {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 12px; border-radius: 4px;
+    background: var(--bg-soft); border: 1px solid var(--border);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  }
+  .defcon .label { color: var(--muted); }
+  .defcon .value { color: var(--high); font-size: 13px; }
+
+  .time-picker {
+    display: inline-flex; gap: 0;
+    background: var(--bg-soft); border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+  }
+  .time-picker button {
+    background: none; border: 0; color: var(--muted);
+    padding: 4px 10px; font: inherit; font-size: 11px;
+    cursor: pointer; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .time-picker button:hover { color: var(--text); }
+  .time-picker button.active {
+    background: var(--accent); color: #000; font-weight: 700;
+  }
+
+  /* ─── Left sidebar (layers) ───────────────────────────────────────── */
+  .left {
+    grid-area: left;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .panel-section {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 14px;
+  }
+  .panel-section h3 {
+    margin: 0 0 8px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .layer-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0;
+    cursor: pointer; user-select: none;
+  }
+  .layer-row:hover .layer-name { color: var(--text); }
+  .layer-row .ck {
+    width: 14px; height: 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    flex-shrink: 0; position: relative;
+  }
+  .layer-row.on .ck { background: var(--accent); border-color: var(--accent); }
+  .layer-row.on .ck::after {
+    content: ""; position: absolute; top: 1px; left: 4px;
+    width: 4px; height: 8px;
+    border: solid #000; border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .layer-row .icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+  .layer-row .layer-name {
+    color: var(--muted); font-size: 12px; flex: 1;
+  }
+  .layer-row .count {
+    color: var(--muted); font-size: 10px;
+    background: var(--bg-soft); padding: 1px 5px; border-radius: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ─── Map area ────────────────────────────────────────────────────── */
+  .map-wrap { grid-area: map; position: relative; background: var(--bg); }
+  #map { position: absolute; inset: 0; }
+  .map-overlay {
+    position: absolute; top: 14px; left: 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 12px;
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    z-index: 5;
+  }
+  .map-overlay strong { color: var(--text); font-weight: 700; }
+  .map-loading {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--muted); font-size: 12px;
+    background: var(--panel); padding: 14px 22px;
+    border: 1px solid var(--border); border-radius: 6px;
+    z-index: 4;
+  }
+  .map-attrib {
+    position: absolute; bottom: 8px; right: 12px;
+    font-size: 10px; color: var(--muted);
+    background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 3px;
+    z-index: 5;
+  }
+
+  /* MapLibre overrides — match the dark theme */
+  .maplibregl-ctrl-group {
+    background: var(--panel) !important;
+    border: 1px solid var(--border) !important;
+  }
+  .maplibregl-ctrl-group button {
+    background-color: transparent !important;
+  }
+  .maplibregl-ctrl-attrib { display: none !important; }
+
+  /* ─── Right sidebar (entity / area deep-dive) ────────────────────── */
+  .right {
+    grid-area: right;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .right .placeholder {
+    padding: 24px;
+    color: var(--muted); font-size: 12px; line-height: 1.6;
+  }
+  .right h2 {
+    margin: 0; padding: 14px;
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .right h2 .close {
+    margin-left: auto; cursor: pointer; color: var(--muted);
+    font-size: 16px; padding: 0 4px;
+  }
+  .right h2 .close:hover { color: var(--text); }
+  .deep-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .deep-section .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .deep-section .value {
+    font-size: 14px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .deep-section .value.crit { color: var(--critical); }
+  .deep-section .value.high { color: var(--high); }
+  .deep-section .value.med  { color: var(--medium); }
+  .deep-section .value.low  { color: var(--low); }
+  .deep-section ul.findings {
+    list-style: none; margin: 8px 0 0; padding: 0;
+  }
+  .deep-section ul.findings li {
+    padding: 7px 0;
+    border-top: 1px solid var(--border);
+    font-size: 12px; line-height: 1.4;
+  }
+  .deep-section ul.findings li:first-child { border-top: 0; }
+  .deep-section ul.findings .sev {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; margin-right: 6px; vertical-align: 1px;
+  }
+  .deep-section ul.findings .sev.critical { background: var(--critical); }
+  .deep-section ul.findings .sev.high     { background: var(--high); }
+  .deep-section ul.findings .sev.medium   { background: var(--medium); }
+  .deep-section ul.findings .sev.low      { background: var(--low); }
+
+  /* ─── Time-scrubber histogram ─────────────────────────────────────── */
+  .scrubber {
+    grid-column: 1 / -1;
+    height: 36px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: stretch;
+    padding: 4px 12px 0;
+    gap: 1px;
+    cursor: crosshair;
+    overflow: hidden;
+    position: relative;
+  }
+  .scrubber .bar {
+    flex: 1; min-width: 1px;
+    background: var(--low);
+    align-self: flex-end;
+    transition: opacity .12s, transform .12s;
+    position: relative;
+  }
+  .scrubber .bar.crit  { background: var(--critical); }
+  .scrubber .bar.high  { background: var(--high); }
+  .scrubber .bar.med   { background: var(--medium); }
+  .scrubber .bar.low   { background: var(--low); }
+  .scrubber .bar.zero  { background: var(--border); height: 1px !important; }
+  .scrubber .bar:hover {
+    opacity: 1.0; transform: scaleY(1.05);
+    transform-origin: bottom;
+  }
+  .scrubber .bar .tip {
+    display: none; position: absolute;
+    bottom: 38px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--border-strong);
+    color: var(--text); font-size: 10px; font-weight: 600;
+    padding: 4px 8px; border-radius: 3px;
+    white-space: nowrap; z-index: 20;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .scrubber .bar:hover .tip { display: block; }
+  .scrubber .marker-now {
+    position: absolute; right: 12px; top: 4px; bottom: 0;
+    width: 1px; background: var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+    pointer-events: none;
+  }
+
+  /* When scrubber is on, insert a row in the grid for it */
+  .app.with-scrubber {
+    grid-template-rows: 44px 36px 1fr 220px 28px;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "scrub  scrub  scrub"
+      "left   map    right"
+      "left   strip  right"
+      "status status status";
+  }
+  .app.with-scrubber.no-strip {
+    grid-template-rows: 44px 36px 1fr 0 28px;
+  }
+  .app.with-scrubber .scrubber { grid-area: scrub; }
+
+  /* ─── Bottom strip (live news + webcams) ──────────────────────────── */
+  .strip {
+    grid-area: strip;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 2fr 1.2fr;
+    gap: 1px;
+    overflow: hidden;
+  }
+  .strip-pane {
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .strip-pane h3 {
+    margin: 0; padding: 6px 12px;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .strip-pane h3 .live-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--critical);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  /* News 3-up: three live news panes side by side, each with its own
+     channel dropdown + Open-on-YouTube escape hatch. Replaces the
+     single tabbed pane that was here before. */
+  .news-3up {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .news-cell {
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    min-width: 0; overflow: hidden;
+  }
+  .news-cell-head {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 6px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .news-pick {
+    flex: 1; min-width: 0;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 3px;
+    font: inherit; font-size: 10px; padding: 2px 4px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .news-cell .open-yt {
+    color: var(--accent); text-decoration: none;
+    padding: 2px 6px;
+    border: 1px solid currentColor; border-radius: 3px;
+    font-size: 11px; line-height: 1;
+    flex-shrink: 0;
+  }
+  .news-cell .open-yt:hover { background: var(--accent); color: #000; }
+  .news-cell iframe {
+    flex: 1; border: 0; background: #000; width: 100%;
+  }
+  /* Legacy single-frame styles preserved for any caller that still
+     references .news-frame, but the markup now uses .news-3up. */
+  .news-frame {
+    flex: 1; border: 0; background: #000; width: 100%;
+  }
+  .webcam-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .webcam-tile {
+    background: #000;
+    position: relative;
+    overflow: hidden;
+  }
+  .webcam-tile iframe { border: 0; width: 100%; height: 100%; }
+  .webcam-tile .label {
+    position: absolute; top: 4px; left: 6px;
+    font-size: 9px; color: #fff;
+    background: rgba(0,0,0,0.6);
+    padding: 1px 6px; border-radius: 2px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    z-index: 5; pointer-events: none;
+  }
+  .webcam-tile .open-yt {
+    position: absolute; top: 4px; right: 4px;
+    color: var(--accent); text-decoration: none;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid currentColor;
+    padding: 1px 6px; border-radius: 2px;
+    font-size: 11px; line-height: 1;
+    z-index: 6;
+  }
+  .webcam-tile .open-yt:hover { background: var(--accent); color: #000; }
+
+  /* Toggle chip in topbar */
+  .strip-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 4px;
+    background: var(--bg-soft); border: 1px solid var(--border);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .strip-toggle:hover { color: var(--text); }
+  .strip-toggle.on { color: var(--accent); border-color: var(--accent); }
+
+  /* ─── Status bar ──────────────────────────────────────────────────── */
+  .statusbar {
+    grid-area: status;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 18px;
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .statusbar .item { display: flex; gap: 6px; align-items: center; }
+  .statusbar .item strong { color: var(--text); font-weight: 700;
+                            font-variant-numeric: tabular-nums; }
+  .statusbar .spacer { flex: 1; }
+
+  /* ─── Tooltip on map ──────────────────────────────────────────────── */
+  .map-tooltip {
+    position: absolute;
+    background: var(--panel); border: 1px solid var(--border-strong);
+    border-radius: 4px; padding: 8px 11px;
+    font-size: 11px; color: var(--text);
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    z-index: 10; max-width: 280px;
+  }
+  .map-tooltip strong { color: var(--accent); }
+  .map-tooltip .meta { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+  /* ─── Mobile fallback ─────────────────────────────────────────────── */
+  @media (max-width: 800px) {
+    .app {
+      grid-template-rows: 44px 1fr 28px;
+      grid-template-columns: 1fr;
+      grid-template-areas: "topbar" "map" "status";
+    }
+    .left, .right { display: none; }
+  }
+</style>
+<script src="/track.js" async></script>
+</head>
+<body>
+<div class="app no-right with-scrubber" id="app">
+  <!-- Top bar -->
+  <div class="topbar">
+    <a href="/" class="brand" style="text-decoration:none;color:inherit" title="Back to Spatial Intelligence cockpit">GLASSBOX <span class="v">MONITOR · v0.1</span></a>
+    <nav class="nav">
+      <a href="/" title="Back to Spatial Intelligence cockpit">← Home</a>
+      <a href="/monitor" class="active">Monitor</a>
+      <a href="/globe">Globe</a>
+      <a href="/network">Network</a>
+      <a href="/signals">Signals</a>
+      <a href="/status">Status</a>
+      <a href="/docs">API</a>
+    </nav>
+    <div class="defcon" title="Severity index — derived from critical findings in window">
+      <span class="label">DEFCON</span>
+      <span class="value" id="defcon-value">—</span>
+    </div>
+    <div class="time-picker" id="time-picker">
+      <button data-h="1">1H</button>
+      <button data-h="6">6H</button>
+      <button data-h="24" class="active">24H</button>
+      <button data-h="48">48H</button>
+      <button data-h="168">7D</button>
+    </div>
+    <span class="strip-toggle on" id="strip-toggle" title="Show / hide live news + webcam strip">📺 Strip</span>
+    <div class="live"><span>LIVE</span></div>
+  </div>
+
+  <!-- Time-scrubber histogram -->
+  <div class="scrubber" id="scrubber" title="Hourly finding density. Hover for count + severity.">
+    <div class="marker-now" title="Now"></div>
+  </div>
+
+  <!-- Left sidebar: layer toggles -->
+  <aside class="left">
+    <div class="panel-section">
+      <h3>Layers</h3>
+      <div id="layer-list"></div>
+    </div>
+    <div class="panel-section">
+      <h3>Legend</h3>
+      <div class="layer-row" style="cursor:default">
+        <div style="width:14px;height:14px;border-radius:50%;background:var(--critical);flex-shrink:0"></div>
+        <div class="layer-name">Critical</div>
+      </div>
+      <div class="layer-row" style="cursor:default">
+        <div style="width:14px;height:14px;border-radius:50%;background:var(--high);flex-shrink:0"></div>
+        <div class="layer-name">High</div>
+      </div>
+      <div class="layer-row" style="cursor:default">
+        <div style="width:14px;height:14px;border-radius:50%;background:var(--medium);flex-shrink:0"></div>
+        <div class="layer-name">Medium</div>
+      </div>
+      <div class="layer-row" style="cursor:default">
+        <div style="width:14px;height:14px;border-radius:50%;background:var(--low);flex-shrink:0"></div>
+        <div class="layer-name">Low</div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <h3>About</h3>
+      <p style="color:var(--muted);font-size:11px;line-height:1.55;margin:0">
+        Live operational picture from <strong style="color:var(--text)">26+ public sources</strong> — AIS, ADS-B, OFAC, EU CFSP, UK OFSI, NASA FIRMS, USGS, GDELT. Findings are derived by Glassbox algorithms running continuously on-prem.
+      </p>
+    </div>
+  </aside>
+
+  <!-- Map -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-overlay">
+      <strong id="overlay-count">0</strong> events &middot;
+      <strong id="overlay-window">24H</strong> window
+    </div>
+    <div class="map-loading" id="map-loading">Loading map…</div>
+    <div class="map-attrib">
+      © OpenStreetMap contributors · Glassbox
+    </div>
+  </div>
+
+  <!-- Right sidebar (deep-dive, hidden until something is clicked) -->
+  <aside class="right collapsed" id="right">
+    <h2><span id="dd-title">Deep-dive</span><span class="close" id="dd-close">×</span></h2>
+    <div id="dd-body"></div>
+  </aside>
+
+  <!-- Live news + webcam strip — 3-up news, 6-tile webcams -->
+  <section class="strip">
+    <div class="strip-pane">
+      <h3>
+        <span class="live-dot"></span>
+        <span>Live News · 3-up</span>
+        <span style="margin-left:auto;font-size:9px;font-weight:400;color:var(--muted)">↗ opens on YouTube</span>
+      </h3>
+      <div class="news-3up" id="news-3up">
+        <!-- 3 panes built by JS so the channel list lives in one place -->
+      </div>
+    </div>
+    <div class="strip-pane">
+      <h3>
+        <span class="live-dot"></span>
+        <span>Live Webcams · 6 cams</span>
+        <span style="margin-left:auto;font-size:9px;font-weight:400;color:var(--muted)">↗ opens on YouTube</span>
+      </h3>
+      <div class="webcam-grid" id="webcam-grid">
+        <!-- Webcam tiles built by JS so the source list lives in one place -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <div class="item"><span>Findings:</span><strong id="status-findings">—</strong></div>
+    <div class="item"><span>Critical:</span><strong id="status-critical">—</strong></div>
+    <div class="item"><span>Vessels:</span><strong id="status-vessels">—</strong></div>
+    <div class="item"><span>Aircraft:</span><strong id="status-aircraft">—</strong></div>
+    <div class="spacer"></div>
+    <div class="item"><span>Updated:</span><strong id="status-updated">—</strong></div>
+    <div class="item"><span>Refresh in:</span><strong id="status-countdown">—</strong></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin=""></script>
+<script src="/monitor/monitor.js"></script>
+</body>
+</html>

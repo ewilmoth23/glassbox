@@ -1,0 +1,1372 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GLASSBOX SOURCES INVENTORY — the operational license/ToS gate
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Every ingester MUST have an entry here. Backend at startup:
+#   1. Refuses to start any ingester missing an entry
+#   2. Refuses to start any ingester where enabled: false
+#   3. For v1.0: refuses to start any ingester where commercial_use_ok: false
+#
+# This file is also the FRONTEND attribution source — the UI footer reads
+# this to render "Data sources: ..." with proper credit.
+#
+# When adding a new ingester:
+#   1. Read LEGAL_COMPLIANCE_REGISTRY.md Chapters 1, 2, 3 first
+#   2. Check the source against Chapter 2 NEVER-USE list
+#   3. Add an entry here with HONEST values for every field
+#   4. Get sign-off (your own, in single-dev mode) that no Vector #1-#12 risk
+#   5. Then write the ingester
+#
+# Field reference:
+#   id                    — short slug, matches ingester filename
+#   name                  — human-readable for UI
+#   url                   — base URL or WS endpoint
+#   auth                  — none / api_key_env(VAR) / oauth2_client_credentials_env(...) / etc.
+#   license               — short tag — see LEGAL_COMPLIANCE_REGISTRY Chapter 3
+#   license_url           — link to upstream's license/ToS
+#   attribution           — EXACT text to render in UI when this source contributes
+#   redistributable       — can we re-emit raw records to consumers via firehose?
+#   pii_level             — none / low / medium / high
+#   fcra_safe             — can be used for FCRA-covered decisions? (always false in v1.0)
+#   surveillance_prohibited — does source ToS prohibit surveillance use?
+#   commercial_use_ok     — free tier explicitly permits commercial use?
+#   rate_limit            — human-readable
+#   poll_interval_sec     — operational cadence
+#   enabled               — false = ingester refuses to start
+#   disabled_reason       — text if enabled: false
+#   migrate_to_pro        — if enabled: false because of license, true means re-enable in v1.2 Pro
+#
+# Last reviewed: 2026-05-27 (P2-A Phase 1 MVP — cisa_kev added, spamhaus_drop activated)
+# ═══════════════════════════════════════════════════════════════════════════
+
+sources_inventory_version: 1
+last_reviewed: '2026-05-27'
+last_reviewed_by: 'ethan + claude'
+
+# Operating rules read by the Ingester base class:
+operating_rules:
+  v1_0_only_commercial_ok: true   # refuse any ingester where commercial_use_ok: false
+  refuse_unknown: true            # refuse any ingester not in this file
+  log_attribution_misses: true    # warn if frontend renders without attribution string
+
+# IMPORTANT: `enabled: true` is the FORWARD-LOOKING intent (license-OK + we plan
+# to ship it in v1.0). Operationally, an ingester is only ACTIVE if BOTH:
+#   - sources.yaml row has `enabled: true`
+#   - The Python ingester file actually exists in 21_GLASSBOX_AI/ingesters/
+#   - The ingester is wired into glassbox_server.py startup
+#
+# Today's actually-shipped + actually-running ingesters (2026-05-04):
+#   - earthquakes (usgs_earthquakes)
+#   - gdelt (gdelt)
+#   - gdelt_topical (gdelt_topical, shipped 2026-05-03)
+#   - planes (CURRENTLY uses OpenSky → MUST refactor to adsb.lol per planes.py
+#            migration in Phase 1, before any commercial deployment)
+#   - ships (CURRENTLY uses Datalastic → VERIFY commercial terms; if
+#           non-commercial, switch to AISStream.io)
+#   - satellites (CelesTrak — already free + commercial OK)
+#
+# Everything else marked `enabled: true` below is on the v1.0 build roadmap.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ENABLED IN v1.0 — free, commercial-OK
+# ═══════════════════════════════════════════════════════════════════════════
+
+sources:
+
+  # ─── Maritime / vessel ─────────────────────────────────────────────
+
+  - id: aisstream
+    name: 'AISStream.io'
+    url: 'wss://stream.aisstream.io/v0/stream'
+    auth: 'api_key_env(AISSTREAM_API_KEY)'
+    license: 'free_with_attribution'
+    license_url: 'https://aisstream.io/documentation'
+    attribution: 'Vessel positions: aisstream.io'
+    redistributable: false   # raw position records cannot be re-published per ToS; we redistribute derived events only
+    pii_level: 'none'         # vessels are not natural persons
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '~300 msg/sec global firehose; subscription message in 3s'
+    poll_interval_sec: 0      # WebSocket
+    enabled: true
+
+  - id: marinecadastre
+    name: 'MarineCadastre AIS (US)'
+    url: 'https://marinecadastre.gov/ais/'
+    auth: 'none'
+    license: 'cc0'
+    license_url: 'https://marinecadastre.gov/about/'
+    attribution: 'US AIS history: MarineCadastre.gov (NOAA + USCG)'
+    redistributable: true     # CC0 = public domain
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'quarterly bulk drops; no API'
+    poll_interval_sec: 86400  # daily check for new bulk
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: ofac_sdn
+    name: 'OFAC SDN List (operator-managed local file)'
+    url: 'file:21_GLASSBOX_AI/data/sdn_advanced.xml'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    license_url: 'https://ofac.treasury.gov/'
+    attribution: 'Sanctions: US Treasury OFAC'
+    redistributable: true     # US Government works are public domain
+    pii_level: 'high'         # named individuals
+    fcra_safe: false          # OFAC explicitly NOT a CRA-grade source
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'n/a — operator manually downloads weekly'
+    poll_interval_sec: 86400  # 24h — re-parses local file (file changes only on operator download)
+    # 2026-05-05 19:15 ET: RE-ENABLED. Treasury's sanctionslist.ofac.treas.gov
+    # returns 403 to automated downloads (geo/UA blocked). Workaround:
+    # operator manually downloads sdn_advanced.xml from OFAC website weekly,
+    # places it at 21_GLASSBOX_AI/data/sdn_advanced.xml. Ingester reads from
+    # disk on each cycle. Confirmed working with Ethan's 124MB download
+    # 2026-05-05.
+    # Operator refresh: visit https://sanctionslist.ofac.treas.gov/Home/SdnList
+    # in browser → download SDN_ENHANCED.XML → save as sdn_advanced.xml in
+    # the data/ folder. Re-do weekly (5-second task).
+    enabled: true
+
+  - id: openfema
+    name: 'FEMA Disaster Declarations'
+    url: 'https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    license_url: 'https://www.fema.gov/about/openfema/data-sets'
+    attribution: 'Disaster declarations: FEMA'
+    redistributable: true     # US Government works = public domain (17 USC §105)
+    pii_level: 'none'         # geographic + program data only
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable'
+    poll_interval_sec: 1800   # 30 min — declarations issue at most a few/day
+    enabled: true
+
+  - id: usgs_volcano
+    name: 'USGS Volcano Hazards Program'
+    url: 'https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    license_url: 'https://www.usgs.gov/'
+    attribution: 'Volcanic activity: USGS VHP'
+    redistributable: true     # US Government works = public domain (17 USC §105)
+    pii_level: 'none'         # named volcanoes only, no individuals
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable'
+    poll_interval_sec: 900    # 15 min — small payload, alerts update intra-day
+    enabled: true
+
+  - id: uk_ofsi
+    name: 'UK OFSI Consolidated Sanctions List'
+    url: 'https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.xml'
+    auth: 'none'
+    license: 'ogl_v3'         # UK Open Government Licence v3.0
+    license_url: 'https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/'
+    attribution: 'Sanctions: UK OFSI (Crown Copyright, OGL v3.0)'
+    redistributable: true     # OGL v3.0 explicitly permits commercial use w/ attribution
+    pii_level: 'high'         # named individuals (we ingest only Ship records)
+    fcra_safe: false          # not a CRA-grade source
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'n/a — direct HTTPS download'
+    poll_interval_sec: 3600   # 1h — matches OFAC cadence
+    enabled: true
+
+  # ─── Aviation ──────────────────────────────────────────────────────
+
+  - id: adsb_lol
+    name: 'adsb.lol'
+    url: 'https://api.adsb.lol/'
+    auth: 'none'
+    license: 'odbl'
+    license_url: 'https://adsb.lol/'
+    attribution: 'Aircraft positions: adsb.lol (ODbL)'
+    redistributable: true     # ODbL allows redistribution with share-alike
+    pii_level: 'none'         # aircraft, not persons
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # ODbL OSINT-friendly, drop-in for ADSBx
+    rate_limit: 'dynamic; future feeder key'
+    poll_interval_sec: 10
+    enabled: true             # PRIMARY aircraft source for v1.0 (replaces OpenSky as default)
+
+  - id: faa_registry
+    name: 'FAA Aircraft Registry'
+    url: 'https://registry.faa.gov/database/'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    attribution: 'FAA Aircraft Registry'
+    redistributable: true
+    pii_level: 'medium'       # owner names + addresses; new 49 USC § 44114(b) ownership-withholding flag must be honored
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'free 60MB CSV daily'
+    poll_interval_sec: 86400
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: ourairports
+    name: 'OurAirports'
+    url: 'https://davidmegginson.github.io/ourairports-data/'
+    auth: 'none'
+    license: 'cc0'
+    attribution: 'Airports: OurAirports (CC0)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'CSV nightly via GitHub Pages'
+    poll_interval_sec: 86400
+    enabled: true
+
+  - id: noaa_aviation_weather
+    name: 'NOAA Aviation Weather Center'
+    url: 'https://aviationweather.gov/data/api/'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    attribution: 'METAR/TAF: NOAA Aviation Weather Center'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'unlimited; declared User-Agent'
+    poll_interval_sec: 300
+    enabled: true             # NEW v1.0 ingester to add
+
+  # ─── Earth / weather / disaster ────────────────────────────────────
+
+  - id: usgs_earthquakes
+    name: 'USGS Earthquakes'
+    url: 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    attribution: 'Earthquakes: USGS'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published cap'
+    poll_interval_sec: 300
+    enabled: true
+
+  - id: noaa_nws
+    name: 'NOAA National Weather Service'
+    url: 'https://api.weather.gov/'
+    auth: 'none'             # User-Agent with contact email required
+    license: 'public_domain_us_gov'
+    attribution: 'Weather alerts: NOAA NWS'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable; UA required'
+    poll_interval_sec: 300
+    enabled: true             # NEW v1.0 ingester (replaces Open-Meteo direct)
+
+  # NOTE: a duplicate `- id: gdacs` block originally lived here (API-endpoint
+  # variant, free_with_attribution). Removed by P0-B on 2026-05-19 in favor
+  # of the canonical RSS-feed block below (CC BY 4.0, proper attribution).
+  # The live `GdacsIngester` consumes the RSS feed.
+
+  - id: nasa_eonet
+    name: 'NASA EONET'
+    url: 'https://eonet.gsfc.nasa.gov/api/v3/'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    attribution: 'Natural events: NASA EONET'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable'
+    poll_interval_sec: 1800
+    enabled: true             # already in our scope
+
+  - id: nasa_firms
+    name: 'NASA FIRMS Active Fires'
+    url: 'https://firms.modaps.eosdis.nasa.gov/api/'
+    auth: 'api_key_env(NASA_FIRMS_MAP_KEY)'
+    license: 'public_domain_us_gov'
+    attribution: 'Wildfires: NASA FIRMS (MODIS/VIIRS)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'free with key'
+    poll_interval_sec: 1800
+    enabled: true
+
+  - id: waqi_aqi
+    name: 'WAQI World Air Quality Index'
+    url: 'https://api.waqi.info/'
+    auth: 'api_key_env(WAQI_API_TOKEN)'
+    license: 'free_with_attribution'
+    license_url: 'https://aqicn.org/data-platform/token/'
+    attribution: 'Air Quality: World Air Quality Index Project (aqicn.org)'
+    redistributable: true     # WAQI free tier explicitly allows commercial use with attribution
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '~1k req/sec/key with real token (was demo: globally throttled)'
+    poll_interval_sec: 600
+    enabled: true             # NEW v1.0 — backend version (replaces 4 hardcoded demo-token sites in glassbox.html)
+
+  - id: nasa_neo
+    name: 'NASA Near-Earth Object Web Service'
+    url: 'https://api.nasa.gov/neo/rest/v1/'
+    auth: 'api_key_env(NASA_API_KEY)'
+    license: 'public_domain_us_gov'
+    attribution: 'Asteroid data: NASA NEO Web Service (JPL)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '1,000 req/hr free tier (vs 30/hr DEMO_KEY)'
+    poll_interval_sec: 21600  # 6h — NEO catalog updates daily
+    enabled: true             # NEW v1.0 — backend version
+
+  - id: nasa_donki
+    name: 'NASA DONKI Space Weather'
+    url: 'https://api.nasa.gov/DONKI/'
+    auth: 'api_key_env(NASA_API_KEY)'
+    license: 'public_domain_us_gov'
+    attribution: 'Space weather: NASA DONKI (Space Weather Database Of Notifications)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '1,000 req/hr free tier'
+    poll_interval_sec: 3600   # 1h
+    enabled: true             # NEW v1.0 — backend version (solar flares, CMEs, etc.)
+
+  - id: noaa_swpc
+    name: 'NOAA Space Weather Prediction Center'
+    url: 'https://services.swpc.noaa.gov/products/alerts.json'
+    auth: 'none'              # public domain US Gov data, no key required
+    license: 'public_domain_us_gov'
+    attribution: 'Space-weather alerts: NOAA Space Weather Prediction Center'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published limit; reasonable polling expected'
+    poll_interval_sec: 300    # 5 min — SWPC posts alerts as conditions change
+    enabled: true             # NEW 2026-05-08: real-time K/G/R/S alerts
+
+  - id: noaa_nhc
+    name: 'NOAA National Hurricane Center'
+    url: 'https://www.nhc.noaa.gov/CurrentStorms.json'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    attribution: 'Tropical cyclones: NOAA National Hurricane Center'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published limit; CDN-cached, reasonable polling'
+    poll_interval_sec: 300    # 5 min — NHC advisories every 6h, intermediate at 3h
+    enabled: true             # NEW 2026-05-08: Atlantic + East Pacific basin coverage
+
+  - id: gdacs
+    name: 'GDACS Global Disaster Alert and Coordination System'
+    url: 'https://www.gdacs.org/xml/rss.xml'
+    auth: 'none'
+    license: 'cc_by_4_0'
+    license_url: 'https://creativecommons.org/licenses/by/4.0/'
+    attribution: 'Sourced from GDACS, European Commission Joint Research Centre, CC BY 4.0'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'GDACS recommends polling no faster than every 10 min'
+    poll_interval_sec: 600    # 10 min — GDACS updates ~15 min cycle
+    enabled: true             # NEW 2026-05-08: global disaster alerts w/ alert levels
+
+  - id: hacker_news
+    name: 'Hacker News'
+    url: 'https://hacker-news.firebaseio.com/v0/'
+    auth: 'none'
+    license: 'cc0'
+    attribution: 'Hacker News (CC0 public-domain content; titles/links per individual posters)'
+    redistributable: true
+    pii_level: 'usernames_public'   # HN usernames are public; we don't dedupe-by-user
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'Firebase-hosted; tolerant of reasonable polling'
+    poll_interval_sec: 300    # 5 min
+    enabled: true             # NEW 2026-05-08: tech news firehose, often 4-24h ahead of MSM
+
+  - id: iem_iowa_mesonet
+    name: 'Iowa Environmental Mesonet (Iowa State University)'
+    url: 'https://mesonet.agron.iastate.edu/'
+    auth: 'none'
+    license: 'public_university_open_data'
+    license_url: 'https://mesonet.agron.iastate.edu/disclaimer.php'
+    attribution: 'Radar/satellite tiles: Iowa Environmental Mesonet, Iowa State University'
+    redistributable: true     # public university operational data, no fee + commercial use permitted
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable; declared User-Agent; 4 DNS aliases for high-volume callers'
+    poll_interval_sec: 300
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+    # Endpoints we use:
+    #   /cache/tile.py/1.0.0/{layer}/{z}/{x}/{y}.png   — NEXRAD/MRMS/GOES TMS
+    #   /cgi-bin/wms/...                                — WMS feature service
+    # Reviewed 2026-05-04: Iowa State public service, established 2001+, used by
+    # Bing Maps + ESRI + many commercial weather products. Replaces Rainviewer
+    # (which is personal/educational only).
+
+  - id: emsc_fdsn_event
+    name: 'EMSC SeismicPortal FDSN Event WebService'
+    url: 'https://www.seismicportal.eu/fdsnws/event/1/'
+    auth: 'none'
+    license: 'cc_by_4_0'
+    license_url: 'https://www.seismicportal.eu/fdsn-wsevent.html'
+    attribution: 'European earthquakes: EMSC/CSEM (CC BY 4.0) — DOI 10.17616/R3N93X'
+    redistributable: true     # CC BY 4.0 explicitly permits commercial redistribution with attribution
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # FDSN event endpoint is CC BY 4.0 (verified 2026-05-04)
+    rate_limit: 'max 20K events per request; reasonable polling'
+    poll_interval_sec: 600
+    enabled: true             # NEW v1.0 source
+    # IMPORTANT: Only the FDSN /fdsnws/event/1/query endpoint is CC BY 4.0.
+    # The general EMSC website material (felt reports, comments, etc.) is
+    # COPYRIGHT (non-commercial reuse only per emsc-csem.org/terms.html).
+    # Use ONLY the FDSN endpoint for commercial v1.0.
+
+  - id: iris_dmc_event
+    name: 'IRIS/EarthScope NSF SAGE — DMC Event Service'
+    url: 'https://service.iris.edu/fdsnws/event/1/'
+    auth: 'none'
+    license: 'open_research_attribution'
+    license_url: 'https://ds.iris.edu/ds/nodes/dmc/terms-of-service/acceptable-use-policy/'
+    attribution: 'Global seismic events: IRIS/EarthScope NSF SAGE Facility'
+    redistributable: true     # AUP scope is users of IRIS resources; published data is openly redistributable with citation
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # No commercial restriction in AUP for downstream consumers; IRIS asks for citation
+    rate_limit: 'reasonable; UA preferred'
+    poll_interval_sec: 600
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: celestrak
+    name: 'CelesTrak (satellite TLE catalog)'
+    url: 'https://celestrak.org/'
+    auth: 'none'
+    license: 'free_with_attribution'
+    license_url: 'https://celestrak.org/contact/Disclaimer.php'
+    attribution: 'Satellite orbits: CelesTrak / T.S. Kelso'
+    redistributable: true     # TLEs are derived from US Space Force public data + redistribution permitted with attribution
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # CelesTrak explicitly OK for commercial use with attribution
+    rate_limit: 'reasonable; declared User-Agent preferred'
+    poll_interval_sec: 21600  # 6h; TLEs change slowly
+    enabled: true
+
+  - id: digitraffic_finland
+    name: 'Finnish Transport Agency Digitraffic (Marine)'
+    url: 'https://meri.digitraffic.fi/'
+    auth: 'none'
+    license: 'cc_by_4_0'
+    license_url: 'https://www.digitraffic.fi/en/support/instructions/'
+    attribution: 'Baltic AIS: Finnish Transport Agency / Fintraffic (CC BY 4.0)'
+    redistributable: true     # CC BY 4.0
+    pii_level: 'none'         # vessels not natural persons
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'free; UA required; 5 req/sec recommended'
+    poll_interval_sec: 60
+    enabled: true             # primary commercial-OK AIS source for ships ingester
+
+  - id: barentswatch_ais
+    name: 'BarentsWatch (Norwegian Coastal Administration AIS)'
+    url: 'https://www.barentswatch.no/api/'
+    auth: 'oauth2_client_credentials_env(BARENTSWATCH_CLIENT_ID, BARENTSWATCH_CLIENT_SECRET)'
+    license: 'norwegian_law_open_data'
+    license_url: 'https://www.barentswatch.no/en/about-us/general-terms/'
+    attribution: 'Norwegian AIS: BarentsWatch (Norwegian Coastal Administration)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # Norwegian government open data; commercial use permitted with registration
+    rate_limit: 'free with registration; rate per OAuth client'
+    poll_interval_sec: 120
+    enabled: true             # ships compound additional — degrades gracefully if creds missing
+
+  - id: dma_denmark_ais
+    name: 'Danish Maritime Authority DMI AIS'
+    url: 'https://dmiapi.govcloud.dk/'
+    auth: 'none'
+    license: 'danish_public_data'
+    attribution: 'Danish AIS: Danish Maritime Authority (DMI)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # Danish public-sector data — open commercial use
+    rate_limit: 'reasonable'
+    poll_interval_sec: 120
+    enabled: true             # ships compound additional
+
+  # ─── News / events / geopolitics ───────────────────────────────────
+
+  - id: gdelt
+    name: 'GDELT 2.0 General'
+    url: 'https://api.gdeltproject.org/api/v2/doc/doc'
+    auth: 'none'
+    license: 'free_with_attribution'
+    license_url: 'https://www.gdeltproject.org/about.html'
+    attribution: 'News events: GDELT Project'
+    redistributable: true
+    pii_level: 'medium'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'undocumented; aggressive — small users get 429-flooded'
+    poll_interval_sec: 900
+    # 2026-05-05 19:30 ET: DISABLED for v1.0 after exhaustive attempts to make
+    # GDELT work failed. Tried: direct fetch, paren-wrapped queries, 12s pacing,
+    # split queries, mega-queries, CF Worker proxy. Every approach 429s.
+    # GDELT's rate limit isn't 1-per-5s as published — it's effectively
+    # IP-banned for small users without paid tier. CF Worker proxy doesn't help
+    # because (a) CF Workers use shared IPs GDELT also rate-limits, and
+    # (b) CF cache only stores SUCCESSFUL responses, so every 429 = empty cache
+    # = next request also hits GDELT = also 429.
+    #
+    # v1.0 event coverage WITHOUT GDELT is solid: NOAA NWS (US alerts),
+    # NASA EONET (171 global natural events), EMSC (339 EU earthquakes),
+    # USGS, NASA FIRMS (11,542 fires), GDACS planned. News articles were
+    # additive, not foundational.
+    #
+    # v1.1 path: register NewsData.io key (free 200/day, commercial OK,
+    # geocoded). See GLASSBOX_API_CREDENTIALS_CHECKLIST.md.
+    enabled: false
+    disabled_reason: 'GDELT API path /api/v2/doc/doc rate-limit hostile to small users. Disabled 2026-05-05. **2026-05-09: replaced by gdelt_bulk (different endpoint, public-domain license unchanged).** See 00_MASTER_DOCS/RESEARCH_INTEGRATION_PROPOSAL.md + GLASSBOX_V2_MIGRATION_PLAN Phase 4.A. This entry kept as deprecated reference; do not re-enable.'
+    migrate_to_pro: true       # paid GDELT BigQuery ($300+/mo) bypasses rate limit but Phase 4.A bulk CSV is free
+
+  - id: gdelt_topical
+    name: 'GDELT 2.0 Topical Queries'
+    url: 'https://api.gdeltproject.org/api/v2/doc/doc'
+    auth: 'none'
+    license: 'free_with_attribution'
+    attribution: 'News events: GDELT Project'
+    redistributable: true
+    pii_level: 'medium'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'undocumented; aggressive'
+    poll_interval_sec: 900
+    # 2026-05-05 19:30 ET: DISABLED for v1.0 (same reason as gdelt above).
+    # 2026-05-09: replaced by gdelt_bulk via bulk CSV path. Same deprecation note.
+    enabled: false
+    disabled_reason: 'Same as gdelt above. Replaced by gdelt_bulk.'
+    migrate_to_pro: true
+
+  - id: gdelt_bulk
+    name: 'GDELT 2.0 Bulk CSV (Events + GKG)'
+    url: 'http://data.gdeltproject.org/gdeltv2/lastupdate.txt'
+    auth: 'none'
+    license: 'public_domain'
+    license_url: 'https://www.gdeltproject.org/about.html'
+    attribution: 'News events: GDELT Project'
+    redistributable: true
+    pii_level: 'medium'        # geocoded news mentions persons; we drop sub-ADM1 records
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'bulk-download endpoint, friendly to 5-min polling'
+    poll_interval_sec: 300     # 5 min, matches GDELT 15-min publication cadence with margin
+    # 2026-05-09: NEW per Ethan "add GDELT in." Replaces gdelt + gdelt_topical.
+    # Bulk CSV path per research M6 (data.gdeltproject.org/gdeltv2/lastupdate.txt
+    # → Events.zip + GKG.zip). Paired with HANDOFF_02 (CAMEO lookup) +
+    # HANDOFF_03 (pre-filter rules engine). See:
+    #   - 21_GLASSBOX_AI/docs/GLASSBOX_V2_MIGRATION_PLAN.md Phase 4.A
+    #   - 00_MASTER_DOCS/research_2026_05_09/HANDOFF_02_cameo_lookup.md
+    #   - 00_MASTER_DOCS/research_2026_05_09/HANDOFF_03_prefilter_engine.md
+    # Ingester at 21_GLASSBOX_AI/ingesters/gdelt_bulk/ (built 2026-05-10
+    # across 11ad31b → 1aea210 → d7939f7 → 52eb144 → 51d757e). HANDOFF_02
+    # CAMEO lookup + HANDOFF_03 prefilter chain (stateless rules + dedup
+    # + bounded queue) all live and tested.
+    enabled: true
+
+  - id: newsdata_io
+    name: 'NewsData.io'
+    url: 'https://newsdata.io/api/1/latest'
+    auth: 'api_key_env(NEWSDATA_IO_KEY)'
+    license: 'free_tier_commercial_ok'
+    license_url: 'https://newsdata.io/policy'
+    attribution: 'News: NewsData.io'
+    redistributable: false    # we surface, don't re-emit raw articles
+    pii_level: 'medium'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # rare gem — explicit commercial OK on free tier
+    rate_limit: '200 credits/day free; ingester polls every 30 min = 48 cycles/day'
+    poll_interval_sec: 1800
+    enabled: true             # SHIPPED 2026-05-05 19:45 ET as GDELT v1.0 replacement
+
+  - id: wikipedia_rest
+    name: 'Wikipedia REST API'
+    url: 'https://en.wikipedia.org/api/rest_v1/'
+    auth: 'none'             # User-Agent strongly recommended
+    license: 'cc_by_sa'
+    attribution: 'Entity enrichment: Wikipedia'
+    redistributable: true     # CC-BY-SA allows redistribution with attribution + share-alike
+    pii_level: 'medium'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published cap; UA required'
+    poll_interval_sec: 0      # on-demand
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: wayback_cdx
+    name: 'Wayback Machine CDX'
+    url: 'https://web.archive.org/cdx/search/cdx'
+    auth: 'none'
+    license: 'free_with_attribution'
+    attribution: 'Web archive: Internet Archive'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '~1 req/sec'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  # ─── Sanctions (free, redistributable) ─────────────────────────────
+
+  - id: eu_cfsp
+    name: 'EU CFSP Consolidated Sanctions List'
+    url: 'https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=<TOKEN>'
+    auth: 'login_token_env(EU_FSF_TOKEN, default=public_token_2017)'
+    license: 'eu_open_data_free_with_attribution'
+    license_url: 'https://webgate.ec.europa.eu/fsd/fsf'
+    attribution: 'EU sanctions: European Commission FSF'
+    redistributable: true     # EU Open Data — commercial use OK with attribution
+    pii_level: 'high'         # named individuals (we only ingest enterprises with IMO)
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable'
+    poll_interval_sec: 3600   # 1h — matches OFAC + UK OFSI cadence
+    enabled: true
+
+  - id: uk_sanctions_list
+    name: 'UK Sanctions List (FCDO)'
+    url: 'https://www.gov.uk/government/publications/the-uk-sanctions-list'
+    auth: 'none'
+    license: 'open_government_licence_uk'
+    attribution: 'UK sanctions: HM Government FCDO'
+    redistributable: true
+    pii_level: 'high'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no API; bulk download'
+    poll_interval_sec: 86400
+    enabled: true             # NEW v1.0 ingester to add (replaces retired OFSI Consolidated)
+
+  # ─── Government / corporate registry ───────────────────────────────
+
+  - id: companies_house_uk
+    name: 'UK Companies House (Streaming)'
+    url: 'https://stream.companieshouse.gov.uk/'
+    auth: 'api_key_env(COMPANIES_HOUSE_API_KEY)'
+    license: 'open_government_licence_uk'
+    attribution: 'Corporate registry: UK Companies House'
+    redistributable: true     # OGL UK allows commercial redistribution
+    pii_level: 'medium'       # PSCs are named persons
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '600 req / 5 min; 2 concurrent stream connections'
+    poll_interval_sec: 0      # streaming
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: sec_edgar
+    name: 'SEC EDGAR'
+    url: 'https://data.sec.gov/'
+    auth: 'none'             # User-Agent required
+    license: 'public_domain_us_gov'
+    attribution: 'SEC filings: U.S. Securities and Exchange Commission'
+    redistributable: true
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '10 req/sec per IP; UA must declare contact'
+    poll_interval_sec: 3600
+    enabled: true             # NEW v1.0 ingester to add
+
+  - id: courtlistener
+    name: 'CourtListener / RECAP v4'
+    url: 'https://www.courtlistener.com/api/rest/v4/'
+    auth: 'token_env(COURTLISTENER_TOKEN)'
+    license: 'free_with_attribution'
+    license_url: 'https://www.courtlistener.com/help/api/rest/'
+    attribution: 'Court records: CourtListener / Free Law Project'
+    redistributable: true
+    pii_level: 'high'         # parties named in litigation
+    fcra_safe: false          # this is the BIGGEST FCRA exposure source — keep off CRA-style features
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '5,000 req/hr default'
+    poll_interval_sec: 3600
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: openfec
+    name: 'OpenFEC'
+    url: 'https://api.open.fec.gov/v1/'
+    auth: 'api_key_env(OPENFEC_API_KEY)'  # api.data.gov umbrella key
+    license: 'public_domain_us_gov'
+    attribution: 'Federal election data: FEC'
+    redistributable: true
+    pii_level: 'medium'       # itemized contributions ≥$200 by name
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '1,000 req/hr with key'
+    poll_interval_sec: 86400
+    enabled: false
+    disabled_reason: 'Phase 2 — not in initial vertical slice scope'
+
+  # ─── Cyber / network OSINT (highest-leverage free tier) ────────────
+
+  - id: ripestat
+    name: 'RIPEstat Data API'
+    url: 'https://stat.ripe.net/data/'
+    auth: 'none'
+    license: 'free_with_attribution'
+    license_url: 'https://stat.ripe.net/docs/02.data-api/'
+    attribution: 'Network data: RIPE NCC RIPEstat'
+    redistributable: true
+    pii_level: 'low'          # IP/AS data, not personal
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no hard limit; 8 concurrent reqs/IP; register if >1k/day'
+    poll_interval_sec: 0      # on-demand
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: crt_sh
+    name: 'crt.sh (Certificate Transparency)'
+    url: 'https://crt.sh/'
+    auth: 'none'             # also direct PostgreSQL at crt.sh:5432, guest user
+    license: 'free_with_attribution'
+    attribution: 'CT logs: crt.sh by Sectigo'
+    redistributable: true
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '~1 req/sec; cache aggressively'
+    poll_interval_sec: 0      # on-demand
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: noaa_ndbc
+    name: 'NOAA NDBC realtime2'
+    url: 'https://www.ndbc.noaa.gov/data/realtime2/'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    license_url: 'https://www.ndbc.noaa.gov/'
+    attribution: 'NDBC observation: NOAA National Data Buoy Center'
+    redistributable: true     # US government works are public domain (Title 17 USC § 105)
+    pii_level: 'none'         # buoy observations, no individuals
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no hard cap; per-station files are ~10-50KB and refresh every 10-30 min'
+    poll_interval_sec: 1800   # 30 min — observations refresh every 10-30 min
+    enabled: true             # v1.0 P2-B Phase 1.5 — live-data upgrade for the noaa_buoys static layer
+
+  - id: open_meteo_forecast
+    name: 'Open-Meteo Forecast'
+    url: 'https://api.open-meteo.com/v1/forecast'
+    auth: 'none'
+    license: 'cc_by_4'
+    license_url: 'https://open-meteo.com/en/license'
+    attribution: 'Climate / weather forecast: Open-Meteo'
+    redistributable: true     # CC-BY 4.0 explicitly permits redistribution
+    pii_level: 'none'         # weather forecast for major cities; no individuals
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # Open-Meteo explicitly permits commercial use
+    rate_limit: 'generous free-tier; ~10K calls/day per IP for non-commercial; commercial pricing offered separately for higher tiers'
+    poll_interval_sec: 21600  # 6h — matches Open-Meteo's forecast refresh cadence
+    enabled: true             # v1.0 P2-B Phase 1.5 — live-data upgrade for the climate_forecast static layer
+
+  - id: cisa_kev
+    name: 'CISA Known Exploited Vulnerabilities Catalog'
+    url: 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
+    auth: 'none'
+    license: 'public_domain_us_gov'
+    license_url: 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog'
+    attribution: 'Known-exploited vulnerabilities: CISA KEV Catalog (US Government, public domain)'
+    redistributable: true     # US Government works are public domain (Title 17 USC § 105)
+    pii_level: 'none'         # CVE catalog entries — vendor / product / vulnerability text; no individuals
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published cap; full catalog ~1MB JSON, updated daily by CISA'
+    poll_interval_sec: 86400  # 24h — KEV catalog is updated at most once per day
+    enabled: true             # v1.0 P2-A cyber lane Phase 1 MVP — gate-free CC0 source
+
+  - id: greynoise_community
+    name: 'GreyNoise Community'
+    url: 'https://api.greynoise.io/v3/community/'
+    auth: 'api_key_env(GREYNOISE_API_KEY)'
+    license: 'free_with_attribution'
+    attribution: 'Internet noise classification: GreyNoise'
+    redistributable: false    # we surface, don't re-emit raw IP labels
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # community tier OK
+    rate_limit: '~10K IP lookups/day with key'
+    poll_interval_sec: 0      # on-demand
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: abuseipdb
+    name: 'AbuseIPDB'
+    url: 'https://api.abuseipdb.com/api/v2/'
+    auth: 'api_key_env(ABUSEIPDB_KEY)'
+    license: 'free_with_attribution'
+    attribution: 'IP abuse intel: AbuseIPDB'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '1,000 checks/day; cache 6h+'
+    poll_interval_sec: 0      # on-demand
+    enabled: false
+    disabled_reason: 'Declared enabled but no ingester implementation exists. Downgraded by P0-B reconciliation on 2026-05-19. To re-enable: write the ingester in 21_GLASSBOX_AI/ingesters/ and register the class in glassbox_server.py candidate_ingesters.'
+
+  - id: spamhaus_drop
+    name: 'Spamhaus DROP/EDROP/ASN-DROP'
+    url: 'https://www.spamhaus.org/drop/'
+    auth: 'none'
+    license: 'free_with_attribution'
+    license_url: 'https://www.spamhaus.org/drop/'
+    attribution: 'Block lists: Spamhaus'
+    redistributable: true     # block lists are explicitly meant for redistribution within block-list use
+    pii_level: 'low'          # /24 IP blocks, no individuals; some entries reference RIR-of-record
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'feed ~50KB total; updates 2-4x/day; Spamhaus requests >=1h between refresh polls'
+    poll_interval_sec: 3600   # 1h — matches Spamhaus operational guidance for free-tier DROP/EDROP polling
+    enabled: true             # v1.0 P2-A cyber lane Phase 1 MVP — gate-free, ToS-redistributable
+
+  - id: alienvault_otx
+    name: 'AlienVault OTX'
+    url: 'https://otx.alienvault.com/api/v1/'
+    auth: 'api_key_env(OTX_API_KEY)'
+    license: 'free_with_attribution'
+    attribution: 'Threat intel: AT&T AlienVault OTX'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published cap'
+    poll_interval_sec: 1800
+    enabled: false
+    disabled_reason: 'Phase 2 — cyber lane'
+
+  - id: validin_community
+    name: 'Validin Community'
+    url: 'https://app.validin.com/api/'
+    auth: 'bearer_env(VALIDIN_TOKEN)'
+    license: 'free_with_attribution'
+    attribution: 'DNS history: Validin'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'continuous'
+    poll_interval_sec: 0      # on-demand
+    enabled: false
+    disabled_reason: 'Phase 2 — cyber lane'
+
+  # ─── Social ────────────────────────────────────────────────────────
+
+  - id: bluesky_jetstream
+    name: 'Bluesky Jetstream'
+    url: 'wss://jetstream2.us-east.bsky.network/subscribe'
+    auth: 'none'
+    license: 'free_with_attribution'
+    license_url: 'https://atproto.com/'
+    attribution: 'Social signal: Bluesky / AT Protocol'
+    redistributable: true     # ATProto is open and intended for redistribution; honor delete events
+    pii_level: 'high'         # public posts by named individuals
+    fcra_safe: false
+    surveillance_prohibited: false  # Bluesky is unique in not prohibiting OSINT use
+    commercial_use_ok: true
+    rate_limit: '~850MB/day filtered; ~18-25GB/day full firehose; wantedCollections (≤100) + wantedDids (≤10000) filters'
+    poll_interval_sec: 0      # WebSocket
+    enabled: true             # NEW v1.0 ingester (already in citizen_osint roadmap)
+
+  # NOTE: a duplicate `- id: hacker_news` block originally lived here (legacy
+  # "Phase 2 — not in initial vertical slice" placeholder). Removed by P0-B
+  # on 2026-05-19 in favor of the canonical block above (CC0, accurate
+  # attribution). The live `HackerNewsIngester` consumes that block's config.
+
+  # ─── Macro / financial ─────────────────────────────────────────────
+
+  - id: fred
+    name: 'FRED (St. Louis Fed)'
+    url: 'https://api.stlouisfed.org/fred/'
+    auth: 'api_key_env(FRED_API_KEY)'
+    license: 'free_with_attribution'
+    attribution: 'Macro data: FRED, St. Louis Fed'
+    redistributable: false    # filter for third-party copyrighted series (Bloomberg/Reuters)
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '~120 calls / 60s'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Phase 2 — not in initial vertical slice (fred_macro.py exists; activate when needed)'
+
+  - id: world_bank
+    name: 'World Bank Indicators'
+    url: 'https://api.worldbank.org/v2/'
+    auth: 'none'
+    license: 'cc_by_4'
+    attribution: 'Indicators: World Bank Open Data (CC-BY 4.0)'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'no published cap'
+    poll_interval_sec: 86400
+    enabled: false
+    disabled_reason: 'Phase 2'
+
+  # ─── Logistics ─────────────────────────────────────────────────────
+
+  - id: imf_portwatch
+    name: 'IMF PortWatch'
+    url: 'https://portwatch.imf.org/'
+    auth: 'none'
+    license: 'free_with_attribution'
+    attribution: 'Port intelligence: IMF PortWatch'
+    redistributable: true
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'weekly Tuesday 9 AM ET'
+    poll_interval_sec: 86400
+    enabled: false
+    disabled_reason: 'Phase 2 — logistics lane'
+
+  - id: fmcsa_qcmobile
+    name: 'FMCSA QCMobile'
+    url: 'https://mobile.fmcsa.dot.gov/qc/services/carriers/'
+    auth: 'login_gov_webkey_env(FMCSA_WEBKEY)'
+    license: 'public_domain_us_gov'
+    attribution: 'Carrier data: FMCSA'
+    redistributable: true
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: 'reasonable; 50 records/response'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Phase 2 — logistics lane'
+
+  # ═══════════════════════════════════════════════════════════════════
+  # DISABLED IN v1.0 (license/ToS gate) — re-evaluate per migrate_to_pro
+  # ═══════════════════════════════════════════════════════════════════
+
+  - id: opensanctions
+    name: 'OpenSanctions (aggregated)'
+    url: 'https://api.opensanctions.org/'
+    auth: 'api_key_env(OPENSANCTIONS_KEY)'
+    license: 'cc_by_nc_4_0'
+    license_url: 'https://www.opensanctions.org/licensing/'
+    attribution: 'Aggregated sanctions: OpenSanctions (CC-BY-NC 4.0 — non-commercial)'
+    redistributable: false
+    pii_level: 'high'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false  # CRITICAL — non-commercial only
+    rate_limit: 'PAYG €0.10/call OR Bulk €595/mo'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Non-commercial license. v1.0 uses OFAC/EU/UK direct instead. Defer to v1.2 Pro w/ paid license.'
+    migrate_to_pro: true
+
+  - id: opensky
+    name: 'OpenSky Network'
+    url: 'https://opensky-network.org/api/'
+    auth: 'oauth2_client_credentials_env(OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET)'
+    license: 'non_commercial_only'
+    license_url: 'https://opensky-network.org/about/terms-of-use'
+    attribution: 'Aircraft positions: OpenSky Network (non-commercial)'
+    redistributable: false
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false
+    rate_limit: '4,000 credits/day authenticated; 8,000 if feeder'
+    poll_interval_sec: 10
+    enabled: false
+    disabled_reason: 'Non-commercial only. v1.0 uses adsb.lol as primary. Defer to v1.2 Pro as BYO-key.'
+    migrate_to_pro: true
+
+  - id: adsb_fi
+    name: 'adsb.fi'
+    url: 'https://api.adsb.fi/'
+    auth: 'none'
+    license: 'non_commercial_only'
+    attribution: 'Aircraft: adsb.fi (non-commercial)'
+    redistributable: false
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false
+    rate_limit: '1 req/sec public'
+    poll_interval_sec: 1
+    enabled: false
+    disabled_reason: 'Non-commercial only. v1.0 uses adsb.lol. Cross-validation only with explicit non-commercial use.'
+    migrate_to_pro: false
+
+  - id: open_meteo
+    name: 'Open-Meteo'
+    url: 'https://api.open-meteo.com/v1/'
+    auth: 'none'
+    license: 'cc_by_nc_4_0'
+    attribution: 'Weather: Open-Meteo (CC-BY-NC 4.0 — non-commercial)'
+    redistributable: false
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false
+    rate_limit: '10K/day, 5K/hr, 600/min'
+    poll_interval_sec: 1800
+    enabled: false
+    disabled_reason: 'Non-commercial license. v1.0 uses NOAA NWS instead.'
+    migrate_to_pro: true     # commercial tier exists ~$50/mo
+
+  - id: virustotal_public
+    name: 'VirusTotal Public API'
+    url: 'https://www.virustotal.com/api/v3/'
+    auth: 'api_key_env(VIRUSTOTAL_API_KEY)'
+    license: 'non_commercial_product_only'
+    license_url: 'https://docs.virustotal.com/docs/please-give-me-an-api-key'
+    attribution: 'Threat intel: VirusTotal'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false
+    rate_limit: '4 req/min, 500/day, 15.5K/month free'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'ToS forbids commercial product integration. v1.2 Pro: BYO-key only OR pay Enterprise ($10K+/yr).'
+    migrate_to_pro: true     # but as BYO-key, not paid by us
+
+  - id: shodan_free
+    name: 'Shodan Free'
+    url: 'https://api.shodan.io/'
+    auth: 'api_key_env(SHODAN_API_KEY)'
+    license: 'free_with_attribution'
+    attribution: 'Internet exposure: Shodan'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true   # Shodan explicitly allows embedding with attribution
+    rate_limit: '~100 query+scan credits/month'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Free tier too thin for production. Defer to v1.2 Pro at $69/mo OR validated lifetime sale ($5-14).'
+    migrate_to_pro: true
+
+  - id: censys_free
+    name: 'Censys Free'
+    url: 'https://search.censys.io/api/v2/'
+    auth: 'basic_auth_env(CENSYS_API_ID, CENSYS_API_SECRET)'
+    license: 'free_with_attribution'
+    attribution: 'Internet exposure: Censys'
+    redistributable: false
+    pii_level: 'low'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: true
+    rate_limit: '100 credits/month free'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Free tier too thin. Defer to v1.2 Pro.'
+    migrate_to_pro: true
+
+  - id: opencorporates
+    name: 'OpenCorporates'
+    url: 'https://api.opencorporates.com/'
+    auth: 'token_env(OPENCORPORATES_TOKEN)'
+    license: 'free_share_alike_only'
+    license_url: 'https://opencorporates.com/info/api'
+    attribution: 'Corporate registry: OpenCorporates (share-alike)'
+    redistributable: false    # share-alike incompatible with closed-source Glassbox
+    pii_level: 'medium'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false  # free tier requires share-alike open license on derivative product
+    rate_limit: '200/mo, 50/day free'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Free tier requires share-alike open license on derivative. Defer to v1.2 Pro with paid Essentials £2,250/yr.'
+    migrate_to_pro: true
+
+  - id: airplanes_live_public_api
+    name: 'airplanes.live (public REST API)'
+    url: 'https://api.airplanes.live/'
+    auth: 'none'
+    license: 'commercial_contract_required'
+    license_url: 'https://airplanes.live/commercial-use/'
+    attribution: 'Aircraft positions: airplanes.live'
+    redistributable: false
+    pii_level: 'none'
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false    # /commercial-use page directs commercial users to email a contact + says "Airplanes.live RapidAPI coming soon"
+    rate_limit: '~1 req/sec public; commercial tier under separate contract'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Public API requires email-based commercial contract per airplanes.live/commercial-use/. v1.0 uses adsb.lol (ODbL, no contract needed). Re-evaluate after RapidAPI launch.'
+    migrate_to_pro: true        # enable in v1.2 Pro IF commercial contract negotiated
+
+  - id: citizen_osint_aggregated
+    name: 'Citizen OSINT (YouTube + Bluesky + Reddit + Telegram + Nitter compound)'
+    url: 'multiple'
+    auth: 'multiple'
+    license: 'mixed_per_platform_tos'
+    attribution: 'Citizen OSINT (per-platform)'
+    redistributable: false
+    pii_level: 'high'           # named users + locations
+    fcra_safe: false
+    surveillance_prohibited: true   # Meta + LinkedIn ToS prohibit; YouTube + Bluesky permit limited use
+    commercial_use_ok: false
+    rate_limit: 'per-platform'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Compound ingester. Per-platform audit pending. Each underlying source (YouTube/Bluesky/Reddit/Telegram/Nitter) needs its own sources.yaml row + verified ToS BEFORE this can ship in v1.0. See API_SOURCES_AUDIT_2026_05_04.md.'
+    migrate_to_pro: true
+
+  - id: traffic_cams_aggregated
+    name: 'Traffic Cams (DOT 511 + HERE + TomTom + Webcams compound)'
+    url: 'multiple'
+    auth: 'multiple'
+    license: 'mixed_per_platform_tos'
+    attribution: 'Traffic cameras (per-platform)'
+    redistributable: false
+    pii_level: 'medium'         # license plates / faces could be in stills
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false
+    rate_limit: 'per-platform'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Compound ingester. HERE + TomTom are paid commercial APIs (deferred to v1.2 Pro). DOT 511 is per-state public domain (US gov). Per-state audit pending; not in v1.0.'
+    migrate_to_pro: true
+
+  - id: police_incidents_aggregated
+    name: 'Police Incidents (city CAD feeds + PulsePoint compound)'
+    url: 'multiple'
+    auth: 'mixed'
+    license: 'mixed_per_jurisdiction'
+    attribution: 'Public safety incidents (per-jurisdiction)'
+    redistributable: false
+    pii_level: 'high'           # incident addresses, names of those involved
+    fcra_safe: false           # CRITICAL — never use for FCRA decisions
+    surveillance_prohibited: false
+    commercial_use_ok: false
+    rate_limit: 'per-source'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Compound ingester. Each city CAD feed and PulsePoint endpoint has its own ToS. Per-jurisdiction audit pending. v1.0 ships without this; consider Phase 2 once each US city ToS is verified individually.'
+    migrate_to_pro: false
+
+  - id: emsc_general_website
+    name: 'EMSC general website material (NOT the FDSN endpoint)'
+    url: 'https://www.emsc-csem.org/'
+    auth: 'none'
+    license: 'copyright_non_commercial'
+    license_url: 'https://www.seismicportal.eu/terms.html'
+    attribution: 'EMSC/CSEM'
+    redistributable: false
+    pii_level: 'low'            # felt reports include rough user locations
+    fcra_safe: false
+    surveillance_prohibited: false
+    commercial_use_ok: false    # Material may only be reproduced for "personal, academic, educational, non-commercial research or other non-commercial use" per terms.html
+    rate_limit: 'n/a'
+    poll_interval_sec: 0
+    enabled: false
+    disabled_reason: 'Non-commercial reuse only per emsc-csem.org/terms.html. For commercial v1.0 use emsc_fdsn_event endpoint instead (CC BY 4.0).'
+    migrate_to_pro: false
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PERMANENTLY DISABLED — Chapter 2 NEVER-USE
+  # ═══════════════════════════════════════════════════════════════════
+
+  - id: zoomeye
+    name: 'ZoomEye (PRC)'
+    enabled: false
+    disabled_reason: 'PRC data egress concern. Permanently disabled per LEGAL_COMPLIANCE_REGISTRY Chapter 2.'
+
+  - id: fofa
+    name: 'Fofa (PRC)'
+    enabled: false
+    disabled_reason: 'PRC data egress concern. Permanently disabled.'
+
+  - id: quake_360
+    name: 'Quake / Qihoo 360 (PRC)'
+    enabled: false
+    disabled_reason: 'On US BIS Entity List. CFAA-adjacent for US persons. Permanently disabled.'
+
+  - id: pimeyes
+    name: 'PimEyes (face search)'
+    enabled: false
+    disabled_reason: 'BIPA + GDPR exposure. Permanently disabled per LEGAL_COMPLIANCE_REGISTRY Chapter 2 (Vector #2).'
+
+  - id: facecheck_id
+    name: 'FaceCheck.ID (face search)'
+    enabled: false
+    disabled_reason: 'BIPA + GDPR exposure. Permanently disabled.'
+
+  - id: clearview_ai
+    name: 'Clearview AI'
+    enabled: false
+    disabled_reason: 'Permanently enjoined in Illinois for private actors. Permanently disabled.'
+
+  - id: twitter_x_scrapers
+    name: 'Twitter/X via third-party scrapers'
+    enabled: false
+    disabled_reason: 'CFAA + ToS violation. If Twitter signal needed, BYO-key with official $0.005/post pay-per-use only.'
+
+  - id: linkedin_scraping
+    name: 'LinkedIn scraping (any kind)'
+    enabled: false
+    disabled_reason: 'Settled CFAA + contract liability. Permanently disabled.'
+
+  - id: meta_scraping
+    name: 'Meta (FB/IG/Threads) logged-in scraping'
+    enabled: false
+    disabled_reason: 'Platform Terms §3.a.iii prohibits surveillance use. Permanently disabled.'
+
+  - id: newsapi_org
+    name: 'NewsAPI.org'
+    enabled: false
+    disabled_reason: 'Localhost-only on free tier. Commercial = $449/mo. Use NewsData.io instead.'
+
+  - id: ip_api_com
+    name: 'ip-api.com'
+    enabled: false
+    disabled_reason: 'Non-commercial only in ToS. Use ipinfo.io Lite (free with attribution, commercial OK) instead.'
+
+  - id: maptiler_free
+    name: 'MapTiler $0 plan'
+    enabled: false
+    disabled_reason: 'Non-commercial only. Use Mapbox PAYG free tier or Stadia Maps for commercial-OK mapping.'
+
+  - id: marinetraffic
+    name: 'MarineTraffic'
+    enabled: false
+    disabled_reason: 'Acquired by Kpler 2022, enterprise-only. Use AISStream.io.'
+
+  - id: iex_cloud
+    name: 'IEX Cloud'
+    enabled: false
+    disabled_reason: 'Shut down August 31, 2024. Use Polygon/Alpha Vantage/Finnhub instead.'
+
+  - id: bing_search_api
+    name: 'Bing Web Search API'
+    enabled: false
+    disabled_reason: 'Retired August 11, 2025. Use Brave Search API ($5/mo) or Tavily (1K credits/mo free) when search needed.'
+
+  - id: rainviewer
+    name: 'Rainviewer (radar tiles)'
+    url: 'https://api.rainviewer.com/public/'
+    license: 'personal_educational_only'
+    license_url: 'https://www.rainviewer.com/api.html'
+    attribution: 'Radar: Rainviewer (PERSONAL/EDUCATIONAL ONLY — DO NOT USE)'
+    enabled: false
+    commercial_use_ok: false
+    disabled_reason: 'Rainviewer API is "available for personal and educational use only" per their api.html (verified 2026-05-04). v1.0 uses iem_iowa_mesonet for radar tiles instead. Permanently disabled.'
+    migrate_to_pro: false      # no path; even paid tier has unclear commercial terms
+
+  - id: nasa_demo_key
+    name: 'NASA api.nasa.gov DEMO_KEY'
+    license: 'rate_limited_developer_only'
+    license_url: 'https://api.nasa.gov/'
+    enabled: false
+    commercial_use_ok: false   # explicitly NOT for production
+    disabled_reason: 'DEMO_KEY = 30 req/IP/hr, "should only be used for initial exploration." Replace with real registered NASA_API_KEY (free tier 1,000 req/hr). NEVER ship DEMO_KEY in production.'
+    migrate_to_pro: false      # use real free key, not Pro tier
+
+  - id: waqi_demo_token
+    name: 'WAQI demo token (?token=demo)'
+    license: 'rate_limited_developer_only'
+    license_url: 'https://aqicn.org/api/'
+    enabled: false
+    commercial_use_ok: false
+    disabled_reason: 'Demo token rate-limited for everyone globally. Register a real WAQI_API_TOKEN at aqicn.org/data-platform/token/ (free, ~1k req/sec/key). NEVER ship demo token in production.'
+    migrate_to_pro: false
+
+  - id: opensea_unofficial
+    name: 'Any unofficial scraper for paywalled news (NYT/WSJ/FT/Bloomberg)'
+    enabled: false
+    commercial_use_ok: false
+    disabled_reason: 'Copyright + ToS violation for paywalled publishers. Use GDELT (open citation graph) for news signals, never scrape paywalled outlets.'
+    migrate_to_pro: false

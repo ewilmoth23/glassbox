@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox signals — embed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer-when-downgrade">
+<style>
+  /* Designed to work as an iframe. No header, no footer, no map.
+     Compact rows, transparent background so the embedding page's
+     theme bleeds through. Configurable via query params:
+       ?max=8                  — number of items to show
+       ?sev=critical,high      — severity floor allowlist
+       ?cat=sanctioned_dark,…  — category id allowlist
+       ?theme=light|dark|auto  — explicit theme override (default auto)
+       ?title=My OSINT feed    — custom heading
+  */
+  :root {
+    --bg: transparent;
+    --text: #14171a;
+    --muted: #6b7077;
+    --border: rgba(0,0,0,0.08);
+    --accent: #2f5fff;
+    --critical: #d6243a;
+    --high: #b94a00;
+    --medium: #6e5800;
+    --low: #1a6b3f;
+  }
+  body.dark, html.dark {
+    --text: #e6edf3; --muted: #8b95a3;
+    --border: rgba(255,255,255,0.10);
+    --accent: #79a8ff;
+    --critical: #ff6071; --high: #ffae5c;
+    --medium: #f3da6c;   --low: #5fd690;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not(.light) {
+      --text: #e6edf3; --muted: #8b95a3;
+      --border: rgba(255,255,255,0.10);
+      --accent: #79a8ff;
+      --critical: #ff6071; --high: #ffae5c;
+      --medium: #f3da6c;   --low: #5fd690;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  body {
+    color: var(--text);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 8px 10px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .heading {
+    font-size: 12px; font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    margin: 0 0 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .heading .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--low);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .heading a { color: var(--muted); }
+  .heading a:hover { color: var(--text); }
+
+  ul.feed {
+    list-style: none; margin: 0; padding: 0;
+  }
+  ul.feed li {
+    padding: 7px 0;
+    border-top: 1px solid var(--border);
+    line-height: 1.4;
+  }
+  ul.feed li:first-child { border-top: 0; }
+  ul.feed .row1 {
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  ul.feed .icon { font-size: 14px; flex-shrink: 0; }
+  ul.feed .title {
+    flex: 1; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  ul.feed .time {
+    color: var(--muted); font-size: 11px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  ul.feed .sub {
+    color: var(--muted); font-size: 11px; margin-top: 1px;
+  }
+  ul.feed .sev {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 5px; vertical-align: 1px;
+  }
+  ul.feed .sev.critical { background: var(--critical); }
+  ul.feed .sev.high     { background: var(--high); }
+  ul.feed .sev.medium   { background: var(--medium); }
+  ul.feed .sev.low      { background: var(--low); }
+
+  .err {
+    color: var(--critical); padding: 10px 0; font-size: 12px;
+  }
+  .empty { color: var(--muted); font-style: italic; padding: 10px 0; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="heading">
+  <span class="dot" id="health-dot"></span>
+  <span id="title">Glassbox — live signals</span>
+  <span style="margin-left:auto"><a id="more" href="https://mewrcreate.com/signals" target="_top" rel="noopener">view all →</a></span>
+</div>
+<ul class="feed" id="feed">
+  <li class="empty">Loading…</li>
+</ul>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+const PARAMS = new URLSearchParams(location.search);
+const MAX = Math.max(1, Math.min(20, parseInt(PARAMS.get("max") || "8", 10)));
+const SEV_ALLOW = (PARAMS.get("sev") || "").split(",").map(s => s.trim()).filter(Boolean);
+const CAT_ALLOW = (PARAMS.get("cat") || "").split(",").map(s => s.trim()).filter(Boolean);
+const THEME = (PARAMS.get("theme") || "auto").toLowerCase();
+const TITLE_OVERRIDE = PARAMS.get("title");
+if (TITLE_OVERRIDE) $("title").textContent = TITLE_OVERRIDE;
+if (THEME === "dark")  document.documentElement.classList.add("dark");
+if (THEME === "light") document.documentElement.classList.add("light");
+
+// Make the "view all" link relative when this widget is served from
+// the same host as /signals (the common case during preview / dev).
+$("more").href = location.origin + "/signals";
+
+function fmtRel(iso) {
+  if (!iso) return "";
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1)  return "now";
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h";
+  return Math.floor(h / 24) + "d";
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;",
+  }[m]));
+}
+
+function renderFeed(d) {
+  // Flatten + sort newest first across categories that pass filters.
+  let rows = [];
+  for (const c of d.categories || []) {
+    if (SEV_ALLOW.length && !SEV_ALLOW.includes(c.severity)) continue;
+    if (CAT_ALLOW.length && !CAT_ALLOW.includes(c.id)) continue;
+    for (const it of c.items || []) {
+      rows.push({
+        title: (it.title || "(untitled)")
+          .replace(/^CRITICAL — /, "").replace(/^ALERT — /, ""),
+        time: it.ts,
+        icon: c.icon, severity: c.severity,
+        href: it.links && it.links.entity
+              ? location.origin + it.links.entity
+              : (location.origin + "/signals"),
+        sub: c.label,
+      });
+    }
+  }
+  rows.sort((a, b) => (b.time || "").localeCompare(a.time || ""));
+  rows = rows.slice(0, MAX);
+
+  const ul = $("feed");
+  if (!rows.length) {
+    ul.innerHTML = `<li class="empty">No findings match the current filters.</li>`;
+    return;
+  }
+  ul.innerHTML = rows.map(r => `
+    <li>
+      <div class="row1">
+        <span class="icon">${escapeHtml(r.icon)}</span>
+        <span class="title">
+          <span class="sev ${r.severity}"></span>
+          <a href="${escapeHtml(r.href)}" target="_top" rel="noopener">
+            ${escapeHtml(r.title)}
+          </a>
+        </span>
+        <span class="time">${escapeHtml(fmtRel(r.time))}</span>
+      </div>
+      <div class="sub">${escapeHtml(r.sub)}</div>
+    </li>`).join("");
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/v1/signals/today?per_category=" + Math.min(20, MAX));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderFeed(await r.json());
+    $("health-dot").style.background = "var(--low)";
+  } catch (e) {
+    $("feed").innerHTML = `<li class="err">Failed to load: ${escapeHtml(e.message || e)}</li>`;
+    $("health-dot").style.background = "var(--critical)";
+  }
+}
+
+load();
+setInterval(load, 60000);   // refresh once per minute
+</script>
+</body>
+</html>

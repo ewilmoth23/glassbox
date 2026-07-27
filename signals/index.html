@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glassbox — today's signals</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Live OSINT signals from Glassbox: sanctioned vessels, dark AIS, restricted-airspace incursions. Updated every five minutes from public sources.">
+<link rel="canonical" href="https://mewrcreate.com/signals">
+<link rel="alternate" type="application/rss+xml"  title="Glassbox — today's signals (RSS)"  href="/signals.rss">
+<link rel="alternate" type="application/feed+json" title="Glassbox — today's signals (JSON Feed)" href="/signals.json">
+
+<!-- Open Graph + Twitter Card -->
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://mewrcreate.com/signals">
+<meta property="og:title"       content="Glassbox — today's OSINT signals">
+<meta property="og:description" content="Sanctioned vessels gone dark, shadow-fleet clusters, restricted-airspace incursions. Live from public OSINT, refreshed every 5 min.">
+<meta property="og:image"       content="https://mewrcreate.com/og-image.png">
+<meta property="og:image:width"  content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name"   content="Glassbox">
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="Glassbox — today's OSINT signals">
+<meta name="twitter:description" content="Sanctioned vessels, shadow fleets, restricted airspace. Live OSINT, refreshed every 5 min.">
+<meta name="twitter:image"       content="https://mewrcreate.com/og-image.png">
+
+<!-- JSON-LD: Dataset structured data so Google indexes the live feed -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  "name": "Glassbox — today's OSINT signals",
+  "description": "Live algorithm-derived OSINT findings: sanctioned vessels, dark AIS, restricted-airspace incursions, shadow-fleet clusters, military aircraft, wildfires, earthquakes.",
+  "url": "https://mewrcreate.com/signals",
+  "license": "https://mewrcreate.com/api/sources",
+  "creator": {
+    "@type": "Organization",
+    "name": "MEWR Creative Enterprises LLC",
+    "url": "https://mewrcreate.com"
+  },
+  "distribution": [
+    { "@type": "DataDownload", "encodingFormat": "application/rss+xml",  "contentUrl": "https://mewrcreate.com/signals.rss" },
+    { "@type": "DataDownload", "encodingFormat": "application/feed+json","contentUrl": "https://mewrcreate.com/signals.json" },
+    { "@type": "DataDownload", "encodingFormat": "text/csv",             "contentUrl": "https://mewrcreate.com/api/v1/signals/snapshot.csv" }
+  ],
+  "keywords": ["OSINT", "sanctions", "AIS", "dark vessel", "shadow fleet", "OFAC", "EU CFSP", "UK OFSI"]
+}
+</script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e3e5e8;
+    --text: #14171a;
+    --muted: #6b7077;
+    --accent: #2f5fff;
+    --critical: #d6243a;
+    --critical-bg: #fff0f1;
+    --high: #b94a00;
+    --high-bg: #fff5e6;
+    --medium: #6e5800;
+    --medium-bg: #fff9d6;
+    --low: #1a6b3f;
+    --low-bg: #ecf7f0;
+    --link: #2f5fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --bg-soft: #161922;
+      --panel: #161922;
+      --border: #232831;
+      --text: #e6edf3;
+      --muted: #8b95a3;
+      --accent: #79a8ff;
+      --critical: #ff6071;
+      --critical-bg: #2b1318;
+      --high: #ffae5c;
+      --high-bg: #2b1d10;
+      --medium: #f3da6c;
+      --medium-bg: #2b260f;
+      --low: #5fd690;
+      --low-bg: #112619;
+      --link: #79a8ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-soft);
+    padding: 18px 24px;
+  }
+  header .row {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+  }
+  header h1 {
+    margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+  }
+  header h1 .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--low); margin-right: 8px;
+    box-shadow: 0 0 0 0 currentColor;
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(95,214,144,0.45); }
+    70% { box-shadow: 0 0 0 6px rgba(95,214,144,0); }
+    100% { box-shadow: 0 0 0 0 rgba(95,214,144,0); }
+  }
+  header .meta { color: var(--muted); font-size: 13px; }
+  header .meta strong { color: var(--text); font-weight: 600; }
+
+  main {
+    max-width: 1100px; margin: 0 auto; padding: 24px;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .summary .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .summary .stat .label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .summary .stat .value {
+    font-size: 26px; font-weight: 700; margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary .stat.critical .value { color: var(--critical); }
+
+  section.category {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  section.category.empty { opacity: 0.55; }
+  section.category h2 {
+    margin: 0 0 4px; font-size: 16px; font-weight: 600;
+    display: flex; align-items: center; gap: 10px;
+  }
+  section.category h2 .icon { font-size: 18px; }
+  section.category h2 .count {
+    margin-left: auto; font-size: 13px; font-weight: 500;
+    padding: 2px 10px; border-radius: 999px;
+    background: var(--bg-soft); color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  section.category .sub {
+    color: var(--muted); font-size: 13px; margin-bottom: 12px;
+  }
+  section.category .pill {
+    display: inline-block; font-size: 11px; padding: 2px 8px;
+    border-radius: 999px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; margin-right: 8px;
+  }
+  .pill.critical { background: var(--critical-bg); color: var(--critical); }
+  .pill.high     { background: var(--high-bg);     color: var(--high); }
+  .pill.medium   { background: var(--medium-bg);   color: var(--medium); }
+  .pill.low      { background: var(--low-bg);      color: var(--low); }
+
+  ul.items { list-style: none; margin: 0; padding: 0; }
+  ul.items li {
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+  }
+  ul.items li:first-child { border-top: 0; }
+  .item-title {
+    font-weight: 600; line-height: 1.35;
+  }
+  .item-meta {
+    font-size: 12px; color: var(--muted);
+    display: flex; gap: 10px; flex-wrap: wrap;
+    grid-column: 1 / -1;
+  }
+  .item-meta span.k {
+    background: var(--bg-soft); padding: 1px 6px; border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .item-time {
+    font-size: 12px; color: var(--muted); white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .item-authority {
+    font-size: 12px; color: var(--muted);
+  }
+  .item-authority strong { color: var(--text); font-weight: 600; }
+
+  .empty-msg { color: var(--muted); font-style: italic; font-size: 13px; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 36px;
+    padding: 24px;
+    color: var(--muted); font-size: 12px;
+  }
+  footer .row { max-width: 1100px; margin: 0 auto; }
+  footer p { margin: 0 0 6px; }
+  footer a { color: var(--link); }
+
+  .err-banner {
+    background: var(--critical-bg); color: var(--critical);
+    border: 1px solid var(--critical); padding: 10px 14px;
+    border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+  }
+
+  .search-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .search-row input {
+    flex: 1;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 inherit;
+    outline: none;
+    transition: border-color .12s;
+  }
+  .search-row input:focus { border-color: var(--accent); }
+  .search-row .hits {
+    color: var(--muted); font-size: 12px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .search-row .clear-btn {
+    color: var(--muted); cursor: pointer; padding: 4px 8px;
+    font-size: 13px; user-select: none;
+  }
+  .search-row .clear-btn:hover { color: var(--text); }
+
+  ul.items li.qhide { display: none; }
+  ul.items li mark {
+    background: var(--medium-bg); color: var(--medium);
+    padding: 0 2px; border-radius: 2px;
+  }
+
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 0 0 18px;
+    align-items: center;
+  }
+  .filters .label {
+    color: var(--muted); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.04em; margin-right: 4px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: 999px;
+    background: var(--bg-soft); color: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip:hover { color: var(--text); border-color: var(--muted); }
+  .chip.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .chip.active.critical { background: var(--critical); border-color: var(--critical); }
+  .chip.active.high     { background: var(--high);     border-color: var(--high); }
+  .chip.active.medium   { background: var(--medium);   border-color: var(--medium); }
+  .chip.active.low      { background: var(--low);      border-color: var(--low); }
+  .chip .dim {
+    font-size: 11px; opacity: 0.85;
+  }
+  section.category.hidden { display: none; }
+
+  .live-pill {
+    display: inline-block; font-size: 11px; padding: 2px 8px;
+    border-radius: 999px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--bg-soft); color: var(--muted);
+  }
+  .live-pill.live { background: var(--low-bg); color: var(--low); }
+  .live-pill.live::before {
+    content: ""; display: inline-block; width: 6px; height: 6px;
+    background: currentColor; border-radius: 50%; margin-right: 5px;
+    vertical-align: 1px;
+    animation: live-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes live-blink { 50% { opacity: 0.35; } }
+
+  ul.items li.fresh {
+    animation: flash-in 1.6s ease-out;
+  }
+  @keyframes flash-in {
+    0%   { background: var(--low-bg); }
+    100% { background: transparent; }
+  }
+
+  #map {
+    height: 360px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+    z-index: 0;
+  }
+  #map.empty { display: none; }
+  .leaflet-container {
+    background: #04060c;
+    font: inherit;
+  }
+  /* Tighten Leaflet's chrome to match the dark cockpit */
+  .leaflet-control-zoom a {
+    background-color: #11151f !important;
+    color: #e9ecf2 !important;
+    border-color: rgba(255,255,255,0.10) !important;
+  }
+  .leaflet-control-zoom a:hover {
+    background-color: #1a2032 !important;
+    color: #ffb547 !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(0,0,0,0.55) !important;
+    color: #7a8597 !important;
+    font-size: 10px !important;
+  }
+  .leaflet-control-attribution a { color: #7fd0ff !important; }
+  .pin {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    cursor: pointer;
+  }
+  .pin.critical { background: var(--critical); }
+  .pin.high     { background: var(--high); }
+  .pin.medium   { background: var(--medium); }
+  .pin.low      { background: var(--low); }
+  .leaflet-popup-content {
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 10px 12px;
+  }
+  .leaflet-popup-content strong { display: block; margin-bottom: 4px; }
+  .leaflet-popup-content a { color: var(--link); }
+
+  @media (max-width: 600px) {
+    main { padding: 16px; }
+    section.category { padding: 14px; }
+    header { padding: 14px 16px; }
+    header h1 { font-size: 16px; }
+    ul.items li { grid-template-columns: 1fr; }
+    .item-time { grid-column: 1 / -1; }
+  }
+</style>
+<script src="/track.js" async></script>
+</head>
+<body>
+<header>
+  <div class="row" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <a href="/" style="text-decoration:none;color:inherit;font-weight:600;border:1px solid currentColor;padding:4px 10px;border-radius:4px;font-size:12px;opacity:0.85" title="Back to Spatial Intelligence cockpit">← Home</a>
+    <h1 style="margin:0;flex:1"><span class="dot" id="health-dot"></span>Glassbox — today's signals</h1>
+    <div class="meta">
+      Window: <strong id="window-label">last 24 hours</strong>
+      &nbsp;·&nbsp; Updated: <strong id="updated-at">—</strong>
+      &nbsp;·&nbsp; Refresh in <strong id="countdown">—</strong>
+      &nbsp;·&nbsp; <span id="live-pill" class="live-pill" title="Real-time push of new findings">offline</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="error" class="err-banner" hidden></div>
+  <div class="summary" id="summary"></div>
+  <div class="search-row">
+    <input id="search" type="search" placeholder="Search vessel, MMSI, IMO, callsign, ICAO, port… (e.g. TITAN, 244010716)" autocomplete="off" spellcheck="false">
+    <span id="search-hits" class="hits"></span>
+    <span id="search-clear" class="clear-btn" hidden>clear</span>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div id="map" class="empty" aria-label="Map of recent findings"></div>
+  <div id="categories"></div>
+</main>
+
+<footer>
+  <div class="row">
+    <p><strong>Subscribe:</strong> <a href="/signals.rss">RSS</a> &nbsp;·&nbsp; <a href="/signals.json">JSON Feed</a> &nbsp;·&nbsp; <a href="/signals.rss?min_severity=critical">RSS critical-only</a> &nbsp;·&nbsp; <a href="/signals.json?min_severity=critical">JSON critical-only</a></p>
+    <p><strong>Download:</strong> <a href="/api/v1/signals/snapshot.csv">CSV (Excel / Google Sheets)</a> &nbsp;·&nbsp; <a href="/api/v1/signals/snapshot.csv?min_severity=critical&amp;limit=5000">all critical (up to 5000)</a></p>
+    <p><strong>Embed:</strong> <a href="/signals/embed">/signals/embed</a> (iframe-friendly widget — params: <code>?max=8&amp;sev=critical&amp;theme=auto</code>)</p>
+    <p><strong>Operational:</strong> <a href="/status">live system status</a> (per-source ingester health) &nbsp;·&nbsp; <a href="/api/v1/health/full">JSON health</a></p>
+    <p>Signals are derived from public sources by Glassbox algorithms running continuously on the MEWR Mac Mini. Sanctions matches reference the live OFAC SDN, EU CFSP, and UK OFSI consolidated lists. Vessel positions from public AIS feeds; aircraft from open ADS-B (adsb.lol, ODbL). Wildfires from NASA FIRMS. Earthquakes from USGS. Refer to <a href="/api/sources">/api/sources</a> for the full source registry.</p>
+    <p>Surfacing a vessel or aircraft on this page does not, by itself, constitute a sanctions allegation against any individual operator — it reflects an automated match to the public consolidated sanctions list at the time of broadcast. Drill into <a href="/api/v1/event/{id}">/api/v1/event/{id}</a> for the full evidence trail.</p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const REFRESH_SEC = 300;
+const $ = (id) => document.getElementById(id);
+
+function fmtRel(iso) {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  const dms = Date.now() - t;
+  const m = Math.floor(dms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h ago";
+  const d = Math.floor(h / 24);
+  return d + "d ago";
+}
+
+function fmtNum(n) {
+  if (n == null) return "—";
+  return n.toLocaleString();
+}
+
+function fmtCoord(lat, lng) {
+  if (lat == null || lng == null) return "";
+  return lat.toFixed(2) + ", " + lng.toFixed(2);
+}
+
+function renderFacts(catId, facts, authority) {
+  const out = [];
+  if (!facts) facts = {};
+  const push = (label, val) => {
+    if (val !== null && val !== undefined && val !== "" && val !== false) {
+      out.push(`<span class="k">${label}: ${val}</span>`);
+    }
+  };
+  // Generic, type-aware label set. Keys we know about per category map
+  // to friendlier labels here; everything else is dropped to keep the
+  // line scannable.
+  if (catId === "sanctioned_dark") {
+    push("vessel", facts.vessel);
+    push("MMSI", facts.mmsi);
+    push("IMO", facts.imo);
+    push("dark", facts.hours_dark != null ? facts.hours_dark.toFixed(1) + "h" : null);
+    push("via", facts.match_kind);
+  } else if (catId === "sanctioned_rendezvous") {
+    push("A", facts.a_name + (facts.a_sanctioned ? " (sanctioned)" : ""));
+    push("B", facts.b_name + (facts.b_sanctioned ? " (sanctioned)" : ""));
+    push("dist", facts.distance_m != null ? facts.distance_m + "m" : null);
+  } else if (catId === "shadow_fleet") {
+    push("vessels", facts.vessels);
+    if (Array.isArray(facts.members) && facts.members.length) {
+      push("members", facts.members.slice(0, 3).join(", "));
+    }
+  } else if (catId === "sanctioned_underway" || catId === "dark_vessel") {
+    push("vessel", facts.vessel);
+    push("MMSI", facts.mmsi);
+    push("IMO", facts.imo);
+    if (facts.hours_dark != null) push("dark", facts.hours_dark.toFixed(1) + "h");
+    push("via", facts.match_kind);
+  } else if (catId === "sanctioned_port") {
+    push("vessel", facts.vessel);
+    push("port", facts.port);
+    push("MMSI", facts.mmsi);
+  } else if (catId === "sanctioned_airspace" || catId === "military_air") {
+    push("call", facts.callsign);
+    push("ICAO", facts.icao24);
+    push(catId === "sanctioned_airspace" ? "airspace" : "operator",
+         facts.country || facts.operator);
+  } else if (catId === "loitering") {
+    push("subject", facts.entity_name);
+    push("MMSI", facts.mmsi);
+    push("ICAO", facts.icao24);
+    if (facts.duration_h != null) push("dur", facts.duration_h.toFixed(1) + "h");
+    if (facts.radius_m != null)   push("r", facts.radius_m + "m");
+  } else if (catId === "wildfires") {
+    push("sat", facts.satellite);
+    push("brightness", facts.brightness);
+    push("conf", facts.confidence);
+  } else if (catId === "quakes") {
+    push("M", facts.magnitude);
+    push("place", facts.place);
+    if (facts.depth_km != null) push("depth", facts.depth_km + "km");
+  }
+  return out.join(" ");
+}
+
+function renderAuthority(a) {
+  if (!a || (!a.name && !a.canonical_id)) return "";
+  const name = a.name ? `<strong>${a.name}</strong>` : "";
+  const cid  = a.canonical_id ? ` <span class="k">${a.canonical_id}</span>` : "";
+  return `via ${name}${cid}`;
+}
+
+function renderItem(catId, it) {
+  const time = it.ts
+    ? `<span class="item-time" title="${it.ts}">${fmtRel(it.ts)}</span>`
+    : "";
+  const facts = renderFacts(catId, it.facts, it.authority);
+  const auth  = renderAuthority(it.authority);
+  const coord = fmtCoord(it.lat, it.lng);
+  const meta  = [facts, auth, coord ? `<span>📍 ${coord}</span>` : ""]
+                .filter(Boolean).join(" &nbsp;·&nbsp; ");
+  const titleText = (it.title || "(untitled)")
+    .replace(/^CRITICAL — /, "")
+    .replace(/^ALERT — /, "");
+  // Wrap the title in a link to the entity profile when the row has
+  // an entity_id (most algorithm-derived events do — sanctions
+  // matches, dark-vessel, rendezvous, etc.).
+  const ent = (it.links && it.links.entity) || (it.entity_id ? "/entity/" + it.entity_id : null);
+  const titleHtml = ent
+    ? `<a href="${ent}">${titleText}</a>`
+    : titleText;
+  return `
+    <li id="row-${it.id}">
+      <div class="item-title">${titleHtml}</div>
+      ${time}
+      ${meta ? `<div class="item-meta">${meta}</div>` : ""}
+    </li>`;
+}
+
+function renderCategory(c) {
+  const empty = c.count === 0;
+  const items = empty
+    ? `<div class="empty-msg">No findings in window.</div>`
+    : `<ul class="items">${c.items.map(it => renderItem(c.id, it)).join("")}</ul>`;
+  const more = (c.count > c.items.length)
+    ? `<div class="sub">Showing ${c.items.length} of ${fmtNum(c.count)}.</div>`
+    : "";
+  return `
+    <section class="category${empty ? " empty" : ""}">
+      <h2>
+        <span class="icon" aria-hidden="true">${c.icon}</span>
+        <span>${c.label}</span>
+        <span class="count">${fmtNum(c.count)}</span>
+      </h2>
+      <div class="sub">
+        <span class="pill ${c.severity}">${c.severity}</span>
+        ${more}
+      </div>
+      ${items}
+    </section>`;
+}
+
+function renderSummary(s) {
+  const items = [
+    { label: "Total findings", value: fmtNum(s.total_findings), cls: "" },
+    { label: "Critical", value: fmtNum(s.critical_count),
+      cls: s.critical_count > 0 ? "critical" : "" },
+    { label: "Categories active", value: fmtNum(s.categories_active), cls: "" },
+  ];
+  return items.map(i => `
+    <div class="stat ${i.cls}">
+      <div class="label">${i.label}</div>
+      <div class="value">${i.value}</div>
+    </div>`).join("");
+}
+
+let countdownTimer = null;
+function startCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  let remaining = REFRESH_SEC;
+  const tick = () => {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    $("countdown").textContent = `${m}:${s.toString().padStart(2, "0")}`;
+    remaining -= 1;
+    if (remaining < 0) { load(); }
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+// Map event_type → category id so SSE pushes can find which section
+// to prepend to. Built lazily from the loaded payload (categories
+// array) so a new event type added on the backend automatically
+// shows up here once the next refresh fires.
+const TYPE_TO_CAT = {
+  sanctioned_vessel_went_dark:      "sanctioned_dark",
+  sanctioned_vessel_rendezvous:     "sanctioned_rendezvous",
+  shadow_fleet_cluster:             "shadow_fleet",
+  sanctioned_vessel_underway:       "sanctioned_underway",
+  sanctioned_port_arrival:          "sanctioned_port",
+  aircraft_in_sanctioned_airspace:  "sanctioned_airspace",
+  military_aircraft_underway:       "military_air",
+  dark_vessel_detected:             "dark_vessel",
+  loitering_detected:               "loitering",
+  nasa_firms:                       "wildfires",
+  usgs_quake:                       "quakes",
+};
+
+let LATEST = null;          // most-recent /signals/today payload
+let CAT_BY_ID = {};         // id → category-element ref for fast SSE patch
+
+// ─── Filter state ──────────────────────────────────────────────────────
+// Persisted in URL hash so a shared link reproduces the view. Empty
+// sets mean "show all" (no filter applied).
+const FILTERS = { sev: new Set(), cat: new Set() };
+
+function readFiltersFromHash() {
+  const h = (location.hash || "").replace(/^#/, "");
+  if (!h) return;
+  for (const part of h.split("&")) {
+    const [k, v] = part.split("=");
+    if (!v) continue;
+    if (k === "sev") v.split(",").filter(Boolean).forEach(s => FILTERS.sev.add(s));
+    if (k === "cat") v.split(",").filter(Boolean).forEach(s => FILTERS.cat.add(s));
+  }
+}
+
+function writeFiltersToHash() {
+  const parts = [];
+  if (FILTERS.sev.size) parts.push("sev=" + [...FILTERS.sev].join(","));
+  if (FILTERS.cat.size) parts.push("cat=" + [...FILTERS.cat].join(","));
+  const next = parts.join("&");
+  history.replaceState(null, "", next ? "#" + next : location.pathname);
+}
+
+function categoryVisible(cat) {
+  if (FILTERS.sev.size && !FILTERS.sev.has(cat.severity)) return false;
+  if (FILTERS.cat.size && !FILTERS.cat.has(cat.id)) return false;
+  return true;
+}
+
+function applyFilters() {
+  if (!LATEST) return;
+  const sections = document.querySelectorAll("section.category");
+  sections.forEach((el, i) => {
+    el.classList.toggle("hidden", !categoryVisible(LATEST.categories[i]));
+  });
+  // Re-paint chip active state.
+  document.querySelectorAll("#filters .chip").forEach(ch => {
+    const k = ch.dataset.kind;
+    const v = ch.dataset.value;
+    const on = (k === "sev" ? FILTERS.sev : FILTERS.cat).has(v);
+    ch.classList.toggle("active", on);
+  });
+  writeFiltersToHash();
+  // Re-render map to drop pins for hidden categories.
+  if (LATEST) rebuildMapFromPayload(filteredPayload(LATEST));
+  // Re-apply text search after a category re-render so the .qhide class
+  // is rebuilt and any <mark> wrappers come back.
+  applySearch();
+}
+
+// ─── Free-text search ──────────────────────────────────────────────────
+
+let SEARCH_Q = "";
+function applySearch() {
+  const q = SEARCH_Q.trim().toLowerCase();
+  const items = document.querySelectorAll("ul.items li");
+  let matched = 0, total = 0;
+  // Strip any existing <mark> wrappers from a previous render.
+  items.forEach(li => {
+    li.querySelectorAll("mark").forEach(m => {
+      m.replaceWith(document.createTextNode(m.textContent));
+    });
+  });
+  if (!q) {
+    items.forEach(li => li.classList.remove("qhide"));
+    $("search-hits").textContent = "";
+    $("search-clear").hidden = true;
+    return;
+  }
+  $("search-clear").hidden = false;
+  items.forEach(li => {
+    total += 1;
+    const haystack = li.textContent.toLowerCase();
+    if (haystack.includes(q)) {
+      li.classList.remove("qhide");
+      matched += 1;
+      // Highlight the first occurrence in the title row only.
+      const title = li.querySelector(".item-title");
+      if (title) {
+        const t = title.textContent;
+        const i = t.toLowerCase().indexOf(q);
+        if (i >= 0) {
+          title.innerHTML =
+            escapeHtml(t.slice(0, i))
+            + "<mark>" + escapeHtml(t.slice(i, i + q.length)) + "</mark>"
+            + escapeHtml(t.slice(i + q.length));
+        }
+      }
+    } else {
+      li.classList.add("qhide");
+    }
+  });
+  $("search-hits").textContent = matched + " of " + total + " match";
+}
+
+function wireSearch() {
+  const input = $("search");
+  // Restore from URL hash on bootstrap (?q= survives across reloads).
+  const m = (location.hash || "").match(/q=([^&]*)/);
+  if (m) {
+    SEARCH_Q = decodeURIComponent(m[1]);
+    input.value = SEARCH_Q;
+  }
+  let timer = null;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      SEARCH_Q = input.value;
+      applySearch();
+      // Stash q into URL hash alongside existing sev/cat state so the
+      // shareable-link behavior we built for chips also covers search.
+      const existing = (location.hash || "").replace(/^#/, "")
+        .split("&").filter(p => p && !p.startsWith("q="));
+      if (SEARCH_Q.trim()) existing.push("q=" + encodeURIComponent(SEARCH_Q));
+      const next = existing.join("&");
+      history.replaceState(null, "", next ? "#" + next : location.pathname);
+    }, 150);
+  });
+  $("search-clear").addEventListener("click", () => {
+    input.value = ""; SEARCH_Q = "";
+    applySearch();
+    input.focus();
+  });
+}
+
+function filteredPayload(d) {
+  // Returns a shallow copy of `d` with categories that fail the filter
+  // dropped, so the map only pins what's currently visible.
+  return { ...d,
+           categories: (d.categories || []).filter(categoryVisible) };
+}
+
+function renderFilters(d) {
+  const sevButtons = ["critical", "high", "medium", "low"].map(s => {
+    const total = d.categories.filter(c => c.severity === s)
+                              .reduce((a, c) => a + c.count, 0);
+    return `<span class="chip ${s}" data-kind="sev" data-value="${s}">
+              <span>${s}</span><span class="dim">${fmtNum(total)}</span>
+            </span>`;
+  }).join("");
+  const catButtons = d.categories.map(c => `
+    <span class="chip" data-kind="cat" data-value="${c.id}">
+      <span>${c.icon} ${c.label}</span><span class="dim">${fmtNum(c.count)}</span>
+    </span>`).join("");
+  return `
+    <span class="label">Severity</span>${sevButtons}
+    <span class="label" style="margin-left:14px">Category</span>${catButtons}
+    <span class="chip" id="chip-clear" title="Clear all filters">clear ✕</span>
+  `;
+}
+
+function wireFilterChips() {
+  $("filters").addEventListener("click", (ev) => {
+    const ch = ev.target.closest(".chip");
+    if (!ch) return;
+    if (ch.id === "chip-clear") {
+      FILTERS.sev.clear(); FILTERS.cat.clear();
+    } else {
+      const set = (ch.dataset.kind === "sev" ? FILTERS.sev : FILTERS.cat);
+      const v = ch.dataset.value;
+      set.has(v) ? set.delete(v) : set.add(v);
+    }
+    applyFilters();
+  });
+}
+
+// ─── Map (Leaflet) ─────────────────────────────────────────────────────
+
+let MAP = null;
+let MAP_LAYER = null;       // L.featureGroup of all current pins
+const MAP_PINS_BY_ID = {};  // event id → marker (so SSE inserts can dedup)
+
+function initMap() {
+  if (MAP || typeof L === "undefined") return;
+  MAP = L.map("map", {
+    worldCopyJump: true,
+    zoomControl: true,
+    attributionControl: true,
+  }).setView([20, 0], 2);
+  // CARTO dark-matter — free tier, attributable. Matches the dark
+  // Spatial Intelligence cockpit aesthetic. Subdomains a/b/c/d for
+  // load-balancing.
+  L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    {
+      maxZoom: 18,
+      subdomains: 'abcd',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+    }
+  ).addTo(MAP);
+  MAP_LAYER = L.featureGroup().addTo(MAP);
+}
+
+function pinIconFor(severity) {
+  return L.divIcon({
+    html: `<div class="pin ${severity}"></div>`,
+    className: "",
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+}
+
+function addPinForItem(catId, sev, it) {
+  if (!MAP) return;
+  if (it.lat == null || it.lng == null) return;
+  if (MAP_PINS_BY_ID[it.id]) return;
+  const m = L.marker([it.lat, it.lng], { icon: pinIconFor(sev) });
+  const cleanTitle = (it.title || "(untitled)")
+    .replace(/^CRITICAL\s+—\s+/, "")
+    .replace(/^ALERT\s+—\s+/, "");
+  const popup =
+    `<strong>${escapeHtml(cleanTitle)}</strong>` +
+    (it.ts ? `<div style="color:#888">${fmtRel(it.ts)}</div>` : "") +
+    `<div style="margin-top:6px"><a href="/api/v1/event/${it.id}">view event</a></div>`;
+  m.bindPopup(popup);
+  m.on("click", () => {
+    // Ensure the popup opens AND scroll the matching list row into view.
+    document.getElementById("row-" + it.id)?.scrollIntoView({
+      behavior: "smooth", block: "center",
+    });
+  });
+  m.addTo(MAP_LAYER);
+  MAP_PINS_BY_ID[it.id] = m;
+}
+
+function rebuildMapFromPayload(d) {
+  initMap();
+  if (!MAP) return;
+  MAP_LAYER.clearLayers();
+  Object.keys(MAP_PINS_BY_ID).forEach(k => delete MAP_PINS_BY_ID[k]);
+  let placed = 0;
+  for (const cat of d.categories || []) {
+    for (const it of cat.items || []) {
+      if (it.lat != null && it.lng != null) {
+        addPinForItem(cat.id, cat.severity, it);
+        placed += 1;
+      }
+    }
+  }
+  const mapEl = document.getElementById("map");
+  if (placed === 0) {
+    mapEl.classList.add("empty");
+    return;
+  }
+  mapEl.classList.remove("empty");
+  // Fit to the pins, bounded so a single pin still shows context.
+  try {
+    const b = MAP_LAYER.getBounds();
+    if (b.isValid()) MAP.fitBounds(b.pad(0.15), { maxZoom: 6 });
+  } catch (e) { /* swallow */ }
+  // Leaflet needs a size invalidation when its container was hidden
+  // when the tile layer was added. fixes blank-tile-grid.
+  setTimeout(() => MAP.invalidateSize(), 0);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;",
+  }[m]));
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/v1/signals/today?window_hours=24");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    LATEST = d;
+    $("error").hidden = true;
+    $("summary").innerHTML  = renderSummary(d.summary);
+    $("categories").innerHTML = d.categories.map(renderCategory).join("");
+    // Index DOM nodes for fast SSE patching.
+    CAT_BY_ID = {};
+    document.querySelectorAll("section.category").forEach((el, i) => {
+      CAT_BY_ID[d.categories[i].id] = { el, cat: d.categories[i] };
+    });
+    $("filters").innerHTML  = renderFilters(d);
+    applyFilters();   // also paints active chip state + filters map
+    $("updated-at").textContent = new Date(d.generated_at)
+      .toLocaleString(undefined, { hour: "2-digit", minute: "2-digit",
+                                   month: "short", day: "numeric" });
+    $("window-label").textContent = "last " + d.window_hours + " hours";
+    $("health-dot").style.background = "var(--low)";
+    startCountdown();
+  } catch (e) {
+    $("error").hidden = false;
+    $("error").textContent = "Failed to load signals: " + (e.message || e)
+      + ". Will retry shortly.";
+    $("health-dot").style.background = "var(--critical)";
+    setTimeout(load, 30000);
+  }
+}
+
+// ─── Live SSE push (reuses /api/v1/alerts/stream) ──────────────────────
+
+let sseSource = null;
+let sseRetryDelay = 1000;     // back off up to 30s
+function setLive(on) {
+  const p = $("live-pill");
+  if (on) { p.className = "live-pill live"; p.textContent = "live"; }
+  else    { p.className = "live-pill";      p.textContent = "offline"; }
+}
+function patchInAlert(alert) {
+  // Map the SSE 'alert' payload onto a /signals item shape and prepend
+  // it to the matching category — same structure that the initial
+  // /signals/today response produced.
+  const catId = TYPE_TO_CAT[alert.event_type];
+  if (!catId) return;
+  const slot = CAT_BY_ID[catId];
+  if (!slot) return;
+  // De-dup against an item that may already be in the snapshot.
+  if (slot.cat.items.some(it => it.id === alert.id)) return;
+  // Re-derive facts + authority client-side from the SSE payload's
+  // properties bag — same shape the server returned in /signals/today.
+  const item = {
+    id: alert.id,
+    ts: alert.event_time,
+    title: alert.title,
+    description: alert.description,
+    severity: alert.severity,
+    lat: alert.lat,
+    lng: alert.lng,
+    entity_id: alert.entity_id || null,
+    facts: facetsFromProps(alert.event_type, alert.properties || {}),
+    authority: authorityFromProps(alert.event_type, alert.properties || {}),
+    links: {
+      event: "/api/v1/event/" + alert.id,
+      entity: alert.entity_id ? "/entity/" + alert.entity_id : null,
+    },
+  };
+  slot.cat.items.unshift(item);
+  if (slot.cat.items.length > 8) slot.cat.items.pop();
+  slot.cat.count += 1;
+  // Re-render this section only — flash the new row briefly.
+  slot.el.outerHTML = renderCategory(slot.cat);
+  const nodes = document.querySelectorAll("section.category");
+  nodes.forEach((el, i) => {
+    if (LATEST.categories[i].id === catId) {
+      CAT_BY_ID[catId] = { el, cat: slot.cat };
+      const first = el.querySelector("ul.items li");
+      if (first) first.classList.add("fresh");
+    }
+  });
+  // Bump summary counts.
+  if (LATEST && LATEST.summary) {
+    LATEST.summary.total_findings += 1;
+    if (slot.cat.severity === "critical") LATEST.summary.critical_count += 1;
+    $("summary").innerHTML = renderSummary(LATEST.summary);
+  }
+  // Add a fresh pin on the map. Don't re-fit bounds (would yank the
+  // user's current zoom mid-investigation) — just drop the marker.
+  addPinForItem(catId, slot.cat.severity, item);
+  if (item.lat != null && item.lng != null) {
+    document.getElementById("map").classList.remove("empty");
+  }
+  // If the user has filters active, re-apply so the freshly-rerendered
+  // section honors them (re-render dropped the .hidden class).
+  if (FILTERS.sev.size || FILTERS.cat.size) applyFilters();
+  // Also bump the chip counts so the count badges stay accurate.
+  if (LATEST) $("filters").innerHTML = renderFilters(LATEST);
+}
+
+// Mirror the api_v1.py _signals_facts_for / _signals_authority_for
+// extractors so SSE-pushed rows look identical to /signals/today rows.
+function facetsFromProps(et, p) {
+  if (et === "sanctioned_vessel_went_dark") {
+    return { vessel: p.live_vessel_name, mmsi: p.mmsi,
+             imo: p.live_imo || p.sanctioned_imo,
+             hours_dark: p.hours_dark, match_kind: p.match_kind,
+             last_seen: p.last_seen_ais };
+  }
+  if (et === "sanctioned_vessel_rendezvous") {
+    return { a_name: p.a_name, b_name: p.b_name, a_mmsi: p.a_mmsi,
+             b_mmsi: p.b_mmsi, distance_m: p.distance_m,
+             a_sanctioned: !!p.a_sanctioned, b_sanctioned: !!p.b_sanctioned };
+  }
+  if (et === "shadow_fleet_cluster") {
+    return { vessels: p.vessel_count || p.size,
+             members: (p.member_names || []).slice(0, 5) };
+  }
+  if (et === "sanctioned_vessel_underway") {
+    return { vessel: p.live_vessel_name, mmsi: p.mmsi,
+             imo: p.live_imo || p.sanctioned_imo, match_kind: p.match_kind };
+  }
+  if (et === "sanctioned_port_arrival") {
+    return { vessel: p.vessel_name || p.live_vessel_name,
+             port: p.port_name || p.port, mmsi: p.mmsi };
+  }
+  if (et === "aircraft_in_sanctioned_airspace") {
+    return { callsign: p.callsign, icao24: p.icao24,
+             country: p.country || p.airspace };
+  }
+  if (et === "military_aircraft_underway") {
+    return { callsign: p.callsign, icao24: p.icao24,
+             operator: p.operator || p.country };
+  }
+  if (et === "dark_vessel_detected") {
+    return { vessel: p.vessel_name || p.live_vessel_name, mmsi: p.mmsi,
+             hours_dark: p.hours_dark || p.duration_h };
+  }
+  if (et === "loitering_detected") {
+    return { entity_name: p.entity_name || p.vessel_name, mmsi: p.mmsi,
+             icao24: p.icao24, duration_h: p.duration_h, radius_m: p.radius_m };
+  }
+  return {};
+}
+function authorityFromProps(et, p) {
+  const auth = p.sanctioning_authority;
+  const cid  = p.sanctioned_canonical_id || p.a_sanctioned_canonical_id
+                                          || p.b_sanctioned_canonical_id;
+  if (auth || cid) return { name: auth, canonical_id: cid };
+  if (et === "nasa_firms") return { name: "NASA FIRMS", canonical_id: null };
+  if (et === "usgs_quake")
+    return { name: "USGS Earthquake Hazards Program", canonical_id: null };
+  return null;
+}
+
+function startSSE() {
+  if (typeof EventSource === "undefined") return;     // very old browser
+  if (sseSource) sseSource.close();
+  sseSource = new EventSource("/api/v1/alerts/stream?poll_sec=5");
+  sseSource.addEventListener("hello", () => {
+    setLive(true); sseRetryDelay = 1000;
+  });
+  sseSource.addEventListener("alert", (ev) => {
+    try { patchInAlert(JSON.parse(ev.data)); } catch (e) { /* swallow */ }
+  });
+  sseSource.addEventListener("ping", () => setLive(true));
+  sseSource.onerror = () => {
+    setLive(false);
+    sseSource.close();
+    sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
+    setTimeout(startSSE, sseRetryDelay);
+  };
+}
+
+readFiltersFromHash();
+wireFilterChips();
+wireSearch();
+load();
+startSSE();
+</script>
+</body>
+</html>
