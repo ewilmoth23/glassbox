@@ -160,21 +160,46 @@ Tests stayed green at every step.
 
 ## Running it
 
+The event store is not optional — the API reads from Postgres on every request, so
+the database has to exist before the server is worth starting.
+
 ```bash
+# 1. Postgres 16+ with PostGIS, TimescaleDB and pgvector.
+#    Full install walkthrough, including a Docker option: docs/POSTGRES_SETUP.md
+psql -h 127.0.0.1 -U glassbox -d glassbox -f infra/postgres/init.sql
+python infra/postgres/run_migrations.py        # applies infra/postgres/migrations/
+
+# 2. Configuration.
+cp .env.example .env          # GLASSBOX_DB_URL + optional per-source credentials
+
+# 3. Run.
 pip install -r requirements.txt
-# Postgres 17 with PostGIS, TimescaleDB, pgvector
-cp .env.example .env          # DATABASE_URL and per-source credentials
 python glassbox_server.py     # serves on :8790
 pytest                        # 555 tests
 ```
 
+`init.sql` installs the extensions and creates the durable schema — 10 tables,
+TimescaleDB hypertables for `position_track` and `event` with retention policies,
+PostGIS `GEOGRAPHY(4326)` columns throughout, and `glassbox_writer` /
+`glassbox_reader` roles. It is idempotent; re-running it on an initialised
+database is a no-op.
+
 Sources requiring credentials stay disabled until configured. The system runs on
-whatever subset you hold rights to.
+whatever subset you hold rights to — a missing key disables one ingester and
+nothing else.
 
 ## Honest limitations
 
 - Single-node deployment. Designed for one operator, not multi-tenant.
 - No authentication layer. Not intended for public exposure without one.
+- `infra/postgres/init.sql` covers the core event store — everything the ingesters,
+  the `/api/v1` surface and the globe read. Four reference tables are **not** in it
+  and were maintained out of band in the original deployment: `ports`, `zones` and
+  `sanction_lookup`, which the `port_call`, `sanctioned_airspace` and
+  `sanctioned_rendezvous` algorithms join against, and `facts`, which two
+  `/api/v1` routes read from a separate knowledge-graph service. Those four
+  algorithms and routes will error on a fresh database until you define and
+  populate them; the rest of the system runs.
 - The 3D frontend is a large single-file CesiumJS application, kept out of this
   repo. The measured optimisation there — Entity → Primitive API plus clustering,
   **1–2 FPS → 18 FPS** at full layer density — is described in `docs/`.

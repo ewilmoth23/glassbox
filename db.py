@@ -58,11 +58,21 @@ import asyncpg
 from dotenv import load_dotenv
 
 
-# ─── Load .env.glassbox from empire root ──────────────────────────────────
+# ─── Load environment ─────────────────────────────────────────────────────
+#
+# Historically this only read ``.env.glassbox`` from the *parent* directory,
+# a holdover from the monorepo this was extracted out of. A standalone clone has
+# no such parent, so a repo-local file is checked first and the parent is kept
+# only as a fallback for existing deployments. First file found wins.
 
-_EMPIRE_ROOT = Path(__file__).resolve().parent.parent
-_ENV_FILE = _EMPIRE_ROOT / ".env.glassbox"
-if _ENV_FILE.exists():
+_REPO_ROOT = Path(__file__).resolve().parent
+_ENV_CANDIDATES = (
+    _REPO_ROOT / ".env.glassbox",
+    _REPO_ROOT / ".env",
+    _REPO_ROOT.parent / ".env.glassbox",
+)
+_ENV_FILE: Optional[Path] = next((p for p in _ENV_CANDIDATES if p.exists()), None)
+if _ENV_FILE is not None:
     load_dotenv(_ENV_FILE)
 
 
@@ -77,10 +87,11 @@ def _build_dsn() -> str:
     user = os.environ.get("GLASSBOX_DB_USER", "glassbox")
     password = os.environ.get("GLASSBOX_DB_PASSWORD")
     if not password:
+        searched = ", ".join(str(p) for p in _ENV_CANDIDATES)
         raise RuntimeError(
             "Glassbox Postgres credentials missing. Expected GLASSBOX_DB_URL or "
-            "GLASSBOX_DB_PASSWORD (+ HOST/PORT/NAME/USER) in .env.glassbox at "
-            f"{_ENV_FILE}."
+            "GLASSBOX_DB_PASSWORD (+ HOST/PORT/NAME/USER). Copy .env.example to "
+            f".env and fill it in. Searched: {searched}."
         )
     return f"postgresql://{user}:{password}@{host}:{port}/{name}"
 
