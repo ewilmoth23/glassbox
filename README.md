@@ -1,10 +1,27 @@
 # Glassbox
 
+
 **Real-time OSINT fusion — 40 licensed data feeds, 13 correlation algorithms, one queryable event model.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Postgres](https://img.shields.io/badge/postgres-PostGIS%20%7C%20TimescaleDB%20%7C%20pgvector-336791?logo=postgresql&logoColor=white)](https://postgis.net/)
+
+## Project status
+
+> **Actively developed. Extracted from a private monorepo, so commit history starts at extraction.** This is a personal project built in the open, published so the
+> work can be read and run. It is not a supported product.
+
+Known gaps and caveats, stated up front:
+
+- Single-node by design; no authentication layer. Not intended for public exposure without one.
+- Several ingesters ship disabled pending licence evidence. See `infra/sources.yaml`.
+- Requires Postgres with PostGIS, TimescaleDB and pgvector; first-run setup is non-trivial.
+
+Issues and pull requests are welcome. If something breaks on first run, that is
+useful information — please open an issue rather than assuming it works for
+everyone else.
+
 
 Glassbox ingests heterogeneous public data — vessel AIS, aircraft ADS-B, satellite
 TLEs, seismic events, wildfires, weather, conflict events, SEC filings, sanctions
