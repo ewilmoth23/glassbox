@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Postgres](https://img.shields.io/badge/postgres-PostGIS%20%7C%20TimescaleDB%20%7C%20pgvector-336791?logo=postgresql&logoColor=white)](https://postgis.net/)
+[![CI](https://github.com/ewilmoth23/glassbox/actions/workflows/ci.yml/badge.svg)](https://github.com/ewilmoth23/glassbox/actions/workflows/ci.yml)
 
 ## Project status
 
@@ -34,7 +35,7 @@ later"* is a **derived** event, computed from three independent feeds that have 
 knowledge of each other.
 
 ```
-76,564 LOC   ·   555 tests   ·   40 ingesters   ·   13 correlation algorithms
+76,564 LOC   ·   1,088 tests   ·   40 ingesters   ·   13 correlation algorithms
 ```
 
 ---
@@ -156,7 +157,7 @@ Tests stayed green at every step.
 | `embeddings.py` | pgvector embedding pipeline |
 | `mcp_servers/` | Model Context Protocol servers over the event store |
 | `infra/sources.yaml` | the license gate |
-| `tests/` | 97 modules, 555 test functions |
+| `tests/` | 95 modules, 1,088 test functions |
 
 ## Running it
 
@@ -175,7 +176,7 @@ cp .env.example .env          # GLASSBOX_DB_URL + optional per-source credential
 # 3. Run.
 pip install -r requirements.txt
 python glassbox_server.py     # serves on :8790
-pytest                        # 555 tests
+pytest                        # 1,088 tests
 ```
 
 `init.sql` installs the extensions and creates the durable schema — 10 tables,
