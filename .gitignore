@@ -33,6 +33,13 @@ build/
 *.log
 logs/
 data/
+# `data/` is deliberately broad, but it also silently excluded two small lookup
+# files the test suite requires, which cost 78 test failures until CI caught it
+# on 2026-08-17. Re-include them explicitly.
+!glassbox_taxonomy/data/
+!glassbox_taxonomy/data/cameo_lookup.json
+!ingesters/gdelt_bulk/prefilter/data/
+!ingesters/gdelt_bulk/prefilter/data/source_quality.json
 briefs/
 _versions/
 _archive/

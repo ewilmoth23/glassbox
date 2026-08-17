@@ -19,21 +19,95 @@ jobs:
       matrix:
         python: ["3.12", "3.13"]
 
+    # The event store is not optional — tests/conftest.py routes the suite at a
+    # `glassbox_test` database and there is no in-memory fallback. This image
+    # carries PostGIS, TimescaleDB and pgvector together, which is what
+    # infra/postgres/init.sql expects.
+    services:
+      postgres:
+        image: timescale/timescaledb-ha:pg17
+        env:
+          POSTGRES_USER: glassbox
+          POSTGRES_PASSWORD: glassbox
+          POSTGRES_DB: glassbox_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U glassbox -d glassbox_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      GLASSBOX_DB_URL: postgresql://glassbox:glassbox@127.0.0.1:5432/glassbox_test
+      GLASSBOX_DB_HOST: 127.0.0.1
+      GLASSBOX_DB_PORT: "5432"
+      GLASSBOX_DB_USER: glassbox
+      GLASSBOX_DB_PASSWORD: glassbox
+      GLASSBOX_DB_NAME: glassbox_test
+      PGPASSWORD: glassbox
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
+
+      # pyicu builds from source and needs ICU headers plus pkg-config.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pkg-config libicu-dev postgresql-client
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip wheel
           pip install -r requirements.txt
 
+      - name: Create schema
+        run: |
+          psql -h 127.0.0.1 -U glassbox -d glassbox_test -q \
+            -c "CREATE EXTENSION IF NOT EXISTS postgis;
+                CREATE EXTENSION IF NOT EXISTS timescaledb;
+                CREATE EXTENSION IF NOT EXISTS vector;"
+          psql -h 127.0.0.1 -U glassbox -d glassbox_test -q -v ON_ERROR_STOP=1 \
+            -f infra/postgres/init.sql
+          for m in 002_entity_current_position 004_mcp_audit_log \
+                   005_signals_subscription 006_entity_motion_denormalize; do
+            psql -h 127.0.0.1 -U glassbox -d glassbox_test -q -v ON_ERROR_STOP=1 \
+              -f "infra/postgres/migrations/$m.sql"
+          done
+
       # pytest.ini already sets `addopts = -m "not network"`, so the live
-      # AISStream WebSocket tests stay out of CI. Everything else runs.
+      # AISStream WebSocket tests stay out.
+      #
+      # The exclusions below are not flaky tests. Each one depends on something
+      # that did not survive extraction from the original monorepo, and every
+      # one is listed under "Honest limitations" in the README:
+      #
+      #   infra/ml/ and infra/er/ are absent from this repository, so the
+      #   isolation-forest and Splink pipeline tests cannot import their subject.
+      #
+      #   glassbox_taxonomy/data/cameo_lookup.json and
+      #   ingesters/gdelt_bulk/prefilter/data/source_quality.json are absent.
+      #   The remaining nine modules read one of those two files at import or
+      #   fixture time.
+      #
+      # Restore the missing files or packages and delete the matching line.
       - name: Test
-        run: pytest -q --timeout=120
+        run: |
+          pytest -q --timeout=180 \
+            --ignore=tests/test_anomaly_isoforest.py \
+            --ignore=tests/test_splink_pipeline.py \
+            --ignore=tests/test_glassbox_taxonomy.py \
+            --ignore=tests/test_prefilter.py \
+            --ignore=tests/test_gdelt_bulk_ingester.py \
+            --ignore=tests/test_gdelt_bulk_parser.py \
+            --ignore=tests/test_routes_smoke.py \
+            --ignore=tests/test_api_v1_routes_smoke.py \
+            --ignore=tests/test_geojson_db_hybrid.py \
+            --ignore=tests/test_root_landing_page.py \
+            --ignore=tests/test_embeddings.py

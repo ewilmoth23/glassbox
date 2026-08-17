@@ -46,3 +46,15 @@ followthemoney>=3.6
 # rest of the codebase has no compile-time dep on this. License:
 # Apache-2.0 (LICENSE_RISK_REGISTER §1.3).
 prometheus-client>=0.20
+
+# Test-only dependencies that were missing from this file. The suite has always
+# needed them — 27 test modules import httpx for the ASGI transport — so a fresh
+# clone could not run `pytest` at all until they were listed. Found by CI on
+# 2026-08-17: 27 collection errors, all ModuleNotFoundError.
+httpx>=0.27
+jsonschema>=4.21
+
+# scipy backs the correlator's firing-rate statistics; statsmodels backs the
+# SARIMAX forecaster. Both were imported but unlisted.
+scipy>=1.11
+statsmodels>=0.14
